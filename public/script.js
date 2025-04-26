@@ -1,48 +1,6 @@
 let ws;
 let sacnTimeout;
-
-const fixtureHandlers = {
-  "TestSquare": (fx) => {
-    const el = document.getElementById(fx.id);
-    if (!el) return;
-    if (fx.dmx.length >= 3) {
-      el.style.backgroundColor = `rgb(${fx.dmx[0]}, ${fx.dmx[1]}, ${fx.dmx[2]})`;
-    }
-  },
-
-  "BOLT1C": (fx) => {
-    const frostValue = fx.dmx[0] || 0;
-    const frostOpacity = frostValue / 255 * 0.6;
-
-    const plate1 = document.getElementById('BOLT1C-Plate-1');
-    const plate2 = document.getElementById('BOLT1C-Plate-2');
-    const main = document.getElementById('BOLT1C-Main');
-
-    if (main && fx.dmx.length >= 2) {
-      main.style.opacity = fx.dmx[1] / 255;
-    }
-    if (plate1 && fx.dmx.length >= 11) {
-      const color = `rgb(${fx.dmx[8]}, ${fx.dmx[9]}, ${fx.dmx[10]})`;
-      plate1.style.backgroundColor = color;
-      plate1.style.boxShadow = `0px 0px 20px 15px ${color.replace('rgb', 'rgba').replace(')', `,${frostOpacity})`)}`;
-    }
-    if (plate2 && fx.dmx.length >= 15) {
-      const color = `rgb(${fx.dmx[12]}, ${fx.dmx[13]}, ${fx.dmx[14]})`;
-      plate2.style.backgroundColor = color;
-      plate2.style.boxShadow = `0px 0px 20px 15px ${color.replace('rgb', 'rgba').replace(')', `,${frostOpacity})`)}`;
-    }
-
-    for (let i = 0; i < 16; i++) {
-      const beam = document.getElementById(`BOLT1C-Beam-${i + 1}`);
-      if (beam && fx.dmx.length >= (16 + i + 1)) {
-        const intensity = fx.dmx[16 + i];
-        beam.style.opacity = intensity / 255;
-        const currentColor = window.getComputedStyle(beam).backgroundColor;
-        beam.style.boxShadow = `0px 0px 20px 15px ${currentColor.replace('rgb', 'rgba').replace(')', `,${frostOpacity})`)}`;
-      }
-    }
-  }
-};
+const fixtureConfigs = {}; // cache loaded configs
 
 function connectWebSocket() {
   if (ws) ws.close();
@@ -53,12 +11,7 @@ function connectWebSocket() {
     const data = JSON.parse(event.data);
 
     if (data.type === 'update') {
-      data.fixtures.forEach(fx => {
-        const handler = fixtureHandlers[fx.fixtureType];
-        if (handler) {
-          handler(fx);
-        }
-      });
+      handleDMXUpdate(data.fixtures);
     }
 
     if (data.type === 'patch') {
@@ -90,7 +43,7 @@ function applySettings() {
 
 function loadFixtures(patch) {
   const container = document.getElementById('fixture-container');
-  container.innerHTML = ''; // Clear previous fixtures
+  container.innerHTML = '';
 
   patch.forEach(async fixture => {
     const wrapper = document.createElement('div');
@@ -109,6 +62,70 @@ function loadFixtures(patch) {
     style.rel = 'stylesheet';
     style.href = `/fixtures/${fixture.fixtureType}/style.css`;
     document.head.appendChild(style);
+
+    // Preload fixture config
+    if (!fixtureConfigs[fixture.fixtureType]) {
+      const configUrl = `/fixtures/${fixture.fixtureType}/config.json`;
+      const configResponse = await fetch(configUrl);
+      const configData = await configResponse.json();
+      fixtureConfigs[fixture.fixtureType] = configData;
+    }
+  });
+}
+
+function handleDMXUpdate(fixtures) {
+  fixtures.forEach(fx => {
+    const wrapper = document.getElementById(fx.id);
+    if (!wrapper) return;
+
+    const config = fixtureConfigs[fx.fixtureType];
+    if (!config) return; // No config loaded yet
+
+    const dmx = fx.dmx;
+
+    // Intensity
+    if (config.channels?.intensity) {
+      const intensityChannel = config.channels.intensity - 1;
+      const main = wrapper.querySelector('[data-element="main"]');
+      if (main && dmx.length > intensityChannel) {
+        main.style.opacity = dmx[intensityChannel] / 255;
+      }
+    }
+
+    // Frost (adds glow)
+    if (config.channels?.frost) {
+      const frostChannel = config.channels.frost - 1;
+      const frostOpacity = dmx[frostChannel] / 255 * 0.6;
+
+      const glowTargets = wrapper.querySelectorAll('[data-element="frost-target"]');
+      glowTargets.forEach(target => {
+        const currentColor = window.getComputedStyle(target).backgroundColor;
+        target.style.boxShadow = `0px 0px 20px 15px ${currentColor.replace('rgb', 'rgba').replace(')', `,${frostOpacity})`)}`;
+      });
+    }
+
+    // RGB attributes
+    for (const key of Object.keys(config.channels)) {
+      if (key.includes('rgb')) {
+        const [rCh, gCh, bCh] = config.channels[key].map(c => c - 1);
+        const element = wrapper.querySelector(`[data-element="${key}"]`);
+        if (element && dmx.length > bCh) {
+          const color = `rgb(${dmx[rCh]}, ${dmx[gCh]}, ${dmx[bCh]})`;
+          element.style.backgroundColor = color;
+        }
+      }
+    }
+
+    // Beam Intensities
+    if (config.channels?.beam_intensities) {
+      config.channels.beam_intensities.forEach((channel, index) => {
+        const beam = wrapper.querySelector(`[data-element="beam-${index + 1}"]`);
+        if (beam && dmx.length >= channel) {
+          const intensity = dmx[channel - 1];
+          beam.style.opacity = intensity / 255;
+        }
+      });
+    }
   });
 }
 
