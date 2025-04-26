@@ -4,17 +4,18 @@ const http = require('http');
 const server = http.createServer(app);
 const WebSocket = require('ws');
 const wss = new WebSocket.Server({ server });
+const dgram = require('dgram');
+const os = require('os');
 const fs = require('fs');
 const path = require('path');
-const os = require('os');
-const { Receiver } = require('sacn'); // <- IMPORTANT: using 'sacn' package!
 
 let config = {
   nic: '127.0.0.1',
   universe: 1
 };
 
-// Load Patch
+let udpSocket;
+
 const patchFilePath = path.join(__dirname, 'patch', 'patch.json');
 const patch = JSON.parse(fs.readFileSync(patchFilePath, 'utf-8'));
 
@@ -32,16 +33,16 @@ app.use(express.static('public'));
 app.use('/fixtures', express.static('fixtures'));
 app.use(express.json());
 
-// NIC listing (only TEST SIGNAL for now)
+// NIC listing
 app.get('/nics', (req, res) => {
   const interfaces = os.networkInterfaces();
-  const nics = [{ name: 'TEST SIGNAL', address: '127.0.0.1' }]; // Add TEST SIGNAL manually
+  const nics = [{ name: 'TEST SIGNAL', address: '127.0.0.1' }];
 
   for (const name of Object.keys(interfaces)) {
     for (const iface of interfaces[name]) {
       if (iface.family === 'IPv4' && !iface.internal) {
         nics.push({
-          name: `${name}`,
+          name: name,
           address: iface.address
         });
       }
@@ -51,82 +52,93 @@ app.get('/nics', (req, res) => {
   res.json(nics);
 });
 
-// Get current config
+// Config handling
 app.get('/config', (req, res) => {
   res.json(config);
 });
 
-// Update config (Apply button triggers this)
 app.post('/config', (req, res) => {
   config = req.body;
   console.log('Updated config:', config);
-  setupReceiver(); // Restart sACN receiver
+  setupReceiver();
   res.sendStatus(200);
 });
 
-// WebSocket connection handling
+// WebSocket handling
 wss.on('connection', (ws) => {
   console.log('New WebSocket client connected.');
-
   ws.send(JSON.stringify({
     type: 'patch',
     data: patch
   }));
 });
 
-// sACN Receiver setup
-let receiver;
+// UDP Socket setup
 function setupReceiver() {
-  if (receiver) {
-    receiver.close();
-    console.log('Closed previous sACN receiver.');
+  if (udpSocket) {
+    udpSocket.close();
+    console.log('Closed previous UDP socket.');
   }
 
-  receiver = new Receiver({
-    universes: [config.universe], // simple!
-    port: 5568,
-    reuseAddr: true
+  udpSocket = dgram.createSocket({ type: 'udp4', reuseAddr: true });
+
+  udpSocket.on('listening', () => {
+    const address = udpSocket.address();
+    console.log(`UDP Socket listening on ${address.address}:${address.port}`);
+
+    const multicastAddress = universeToMulticastAddress(config.universe);
+    udpSocket.addMembership(multicastAddress);
+    console.log(`Joined multicast group ${multicastAddress}`);
   });
 
-  receiver.on('packet', (packet) => {
-    console.log('Received sACN packet. DMX length:', packet.payload.length);
-    console.log('Received sACN packet from Universe:', packet.universe, 'DMX length:', packet.payload.length);
-    const dmx = packet.payload;
+  udpSocket.on('message', (msg) => {
+    // sACN has a 126 byte header before DMX data
+    if (msg.length > 126) {
+      const dmxData = msg.slice(126); // Extract DMX data payload
+      console.log(`Received DMX data: ${dmxData.length} bytes`);
 
-    const fixtureData = patch.map((fixture, index) => {
-      const start = fixture.address - 1;
-      const footprint = fixtureConfigs[fixture.fixtureType]?.footprint || 10;
-      const dmxSlice = dmx.slice(start, start + footprint);
+      const fixtureData = patch.map((fixture, index) => {
+        const start = fixture.address - 1;
+        const footprint = fixtureConfigs[fixture.fixtureType]?.footprint || 10;
+        const dmxSlice = dmxData.slice(start, start + footprint);
 
-      return {
-        id: `fixture-${index + 1}`,
-        fixtureType: fixture.fixtureType,
-        dmx: dmxSlice
-      };
-    });
+        return {
+          id: `fixture-${index + 1}`,
+          fixtureType: fixture.fixtureType,
+          dmx: Array.from(dmxSlice)
+        };
+      });
 
-    wss.clients.forEach(client => {
-      if (client.readyState === WebSocket.OPEN) {
-        client.send(JSON.stringify({
-          type: 'update',
-          fixtures: fixtureData
-        }));
+      wss.clients.forEach(client => {
+        if (client.readyState === WebSocket.OPEN) {
+          client.send(JSON.stringify({
+            type: 'update',
+            fixtures: fixtureData
+          }));
 
-        client.send(JSON.stringify({
-          type: 'dmx_heartbeat'
-        }));
-      }
-    });
+          client.send(JSON.stringify({
+            type: 'dmx_heartbeat'
+          }));
+        }
+      });
+    }
   });
 
-  receiver.on('error', (err) => {
-    console.error('sACN Receiver error:', err);
+  udpSocket.on('error', (err) => {
+    console.error('UDP Socket error:', err);
   });
 
-  console.log(`sACN Receiver listening on ANY NIC Universe ${config.universe}`);
+  udpSocket.bind(5568, '0.0.0.0');
 }
 
-// Initial startup
+// sACN Multicast Address for given universe
+function universeToMulticastAddress(universe) {
+  const high = ((universe >> 8) & 0xff);
+  const low = (universe & 0xff);
+  return `239.255.${high}.${low}`;
+}
+
+// Start server
 setupReceiver();
 
 const PORT = process.env.PORT || 3000;
