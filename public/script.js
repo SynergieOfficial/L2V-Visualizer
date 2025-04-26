@@ -24,12 +24,15 @@ function connectWebSocket() {
     if (data.type === 'update') {
       data.fixtures.forEach(fx => {
         if (!fx.id) return;
-        const el = document.getElementById(fx.id);
-        if (!el) return;
+        const wrapper = document.getElementById(fx.id);
+        if (!wrapper) return;
+
+        const fixtureElement = wrapper.firstElementChild; // Find inner real fixture dynamically
+        if (!fixtureElement) return;
 
         if (fx.fixtureType === "TestSquare") {
           if (fx.dmx.length >= 3) {
-            el.style.backgroundColor = `rgb(${fx.dmx[0]}, ${fx.dmx[1]}, ${fx.dmx[2]})`;
+            fixtureElement.style.backgroundColor = `rgb(${fx.dmx[0]}, ${fx.dmx[1]}, ${fx.dmx[2]})`;
           }
         }
 
@@ -99,17 +102,17 @@ async function loadFixture(fixture) {
   wrapper.innerHTML = html;
   wrapper.dataset.address = fixture.address;
   wrapper.dataset.fixtureType = fixture.fixtureType;
-  wrapper.id = fixture.id; // Use assigned unique id (fixture-1, fixture-2, etc.)
+  wrapper.id = fixture.id; // Assigned unique ID
   container.appendChild(wrapper);
 
-  // Dynamically load fixture CSS
+  // Dynamically load CSS
   const link = document.createElement('link');
   link.rel = "stylesheet";
   link.href = `/fixtures/${fixture.fixtureType}/style.css`;
   document.head.appendChild(link);
 }
 
-// NIC Dropdown & Default Settings
+// NIC Dropdown & Settings
 fetch('/nics')
   .then(res => res.json())
   .then(nics => {
@@ -129,7 +132,7 @@ fetch('/nics')
     console.log('Waiting for Apply to connect to sACN.');
   });
 
-// Settings Cog Icon behavior
+// Settings cog behavior
 const icon = document.getElementById('settings-icon');
 const modal = document.getElementById('settings-modal');
 let hideTimer;
