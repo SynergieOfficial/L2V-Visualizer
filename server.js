@@ -6,7 +6,7 @@ const WebSocket = require('ws');
 const wss = new WebSocket.Server({ server });
 const fs = require('fs');
 const path = require('path');
-const sACNReceiver = require('sacn-js'); // Assuming you're using sacn-js or similar
+//const sACNReceiver = require('sacn-js'); // Assuming you're using sacn-js or similar
 
 let config = {
   nic: '',
