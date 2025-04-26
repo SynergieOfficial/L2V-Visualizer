@@ -13,17 +13,21 @@ function connectWebSocket() {
     if (data.type === 'patch') {
       console.log('Received patch:', data.data);
       const container = document.getElementById('fixture-container');
-      container.innerHTML = ''; // Clear old fixtures if any
-      for (const fixture of data.data) {
+      container.innerHTML = ''; // Clear old fixtures
+      for (let index = 0; index < data.data.length; index++) {
+        const fixture = data.data[index];
+        fixture.id = `fixture-${index + 1}`; // Assign unique ID like fixture-1, fixture-2
         await loadFixture(fixture);
       }
     }
 
     if (data.type === 'update') {
       data.fixtures.forEach(fx => {
-        if (fx.id) {
-          const el = document.getElementById(fx.id);
-          if (!el) return;
+        if (!fx.id) return;
+        const el = document.getElementById(fx.id);
+        if (!el) return;
+
+        if (fx.fixtureType === "TestSquare") {
           if (fx.dmx.length >= 3) {
             el.style.backgroundColor = `rgb(${fx.dmx[0]}, ${fx.dmx[1]}, ${fx.dmx[2]})`;
           }
@@ -95,10 +99,10 @@ async function loadFixture(fixture) {
   wrapper.innerHTML = html;
   wrapper.dataset.address = fixture.address;
   wrapper.dataset.fixtureType = fixture.fixtureType;
-  wrapper.id = fixture.id || fixture.fixtureType + "-" + fixture.address; // Optional unique ID assignment
+  wrapper.id = fixture.id; // Use assigned unique id (fixture-1, fixture-2, etc.)
   container.appendChild(wrapper);
 
-  // Optionally load fixture-specific CSS (future feature)
+  // Dynamically load fixture CSS
   const link = document.createElement('link');
   link.rel = "stylesheet";
   link.href = `/fixtures/${fixture.fixtureType}/style.css`;
