@@ -90,7 +90,7 @@ function setupReceiver() {
 
   receiver.on('packet', (packet) => {
     console.log('Received sACN packet. DMX length:', packet.payload.length);
-
+    console.log('Received sACN packet from Universe:', packet.universe, 'DMX length:', packet.payload.length);
     const dmx = packet.payload;
 
     const fixtureData = patch.map((fixture, index) => {
