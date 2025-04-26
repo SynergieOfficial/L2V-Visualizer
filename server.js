@@ -39,6 +39,20 @@ function loadFixtures() {
 }
 loadFixtures();
 
+const patchFilePath = path.join(__dirname, 'patch', 'patch.json');
+const patch = JSON.parse(fs.readFileSync(patchFilePath, 'utf-8'));
+
+// Load all fixture configs
+const fixtureConfigs = {};
+const fixturesFolder = path.join(__dirname, 'fixtures');
+
+for (const fixtureType of fs.readdirSync(fixturesFolder)) {
+    const configPath = path.join(fixturesFolder, fixtureType, 'config.json');
+    if (fs.existsSync(configPath)) {
+        fixtureConfigs[fixtureType] = JSON.parse(fs.readFileSync(configPath, 'utf-8'));
+    }
+}
+
 function getNICList() {
   const interfaces = os.networkInterfaces();
   const nicList = [];
@@ -111,6 +125,11 @@ app.post('/config', (req, res) => {
 wss.on('connection', () => {
   console.log('WebSocket client connected');
 });
+
+ws.send(JSON.stringify({
+  type: 'patch',
+  data: patch
+}));
 
 server.listen(3000, () => {
   console.log('Server running on http://localhost:3000');

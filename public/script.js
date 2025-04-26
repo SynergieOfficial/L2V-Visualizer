@@ -6,11 +6,22 @@ function connectWebSocket() {
   ws = new WebSocket(`ws://${location.host}`);
 
   ws.onopen = () => console.log('WebSocket connected');
-  ws.onmessage = (event) => {
+
+  ws.onmessage = async (event) => {
     const data = JSON.parse(event.data);
+
+    if (data.type === 'patch') {
+      console.log('Received patch:', data.data);
+      const container = document.getElementById('fixture-container');
+      container.innerHTML = ''; // Clear old fixtures if any
+      for (const fixture of data.data) {
+        await loadFixture(fixture);
+      }
+    }
+
     if (data.type === 'update') {
       data.fixtures.forEach(fx => {
-        if (fx.id === "fixture1") {
+        if (fx.id) {
           const el = document.getElementById(fx.id);
           if (!el) return;
           if (fx.dmx.length >= 3) {
@@ -18,7 +29,7 @@ function connectWebSocket() {
           }
         }
 
-        if (fx.id === "fixture2") {
+        if (fx.fixtureType === "BOLT1C") {
           const frostValue = fx.dmx[0] || 0;
           const frostOpacity = frostValue / 255 * 0.6;
 
@@ -74,19 +85,27 @@ function applySettings() {
   });
 }
 
-function loadAllFixtures() {
-  fetch('/fixtures/BOLT1C/template.html')
-    .then(res => res.text())
-    .then(html => {
-      document.getElementById("fixture2").innerHTML = html;
-    });
+async function loadFixture(fixture) {
+  const container = document.getElementById('fixture-container');
+  const templateUrl = `/fixtures/${fixture.fixtureType}/template.html`;
+  const response = await fetch(templateUrl);
+  const html = await response.text();
 
-  const boltStyle = document.createElement('link');
-  boltStyle.rel = "stylesheet";
-  boltStyle.href = "/fixtures/BOLT1C/style.css";
-  document.head.appendChild(boltStyle);
+  const wrapper = document.createElement('div');
+  wrapper.innerHTML = html;
+  wrapper.dataset.address = fixture.address;
+  wrapper.dataset.fixtureType = fixture.fixtureType;
+  wrapper.id = fixture.id || fixture.fixtureType + "-" + fixture.address; // Optional unique ID assignment
+  container.appendChild(wrapper);
+
+  // Optionally load fixture-specific CSS (future feature)
+  const link = document.createElement('link');
+  link.rel = "stylesheet";
+  link.href = `/fixtures/${fixture.fixtureType}/style.css`;
+  document.head.appendChild(link);
 }
 
+// NIC Dropdown & Default Settings
 fetch('/nics')
   .then(res => res.json())
   .then(nics => {
@@ -103,10 +122,10 @@ fetch('/nics')
   .then(config => {
     if (config.nic) document.getElementById('nic').value = config.nic;
     if (config.universe) document.getElementById('universe').value = config.universe;
-    loadAllFixtures();
-    console.log('Fixtures loaded. Waiting for Apply.');
+    console.log('Waiting for Apply to connect to sACN.');
   });
 
+// Settings Cog Icon behavior
 const icon = document.getElementById('settings-icon');
 const modal = document.getElementById('settings-modal');
 let hideTimer;
