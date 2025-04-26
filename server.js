@@ -82,12 +82,13 @@ function setupReceiver() {
     console.log('Closed previous sACN receiver.');
   }
 
-  receiver = new Receiver({
-    universes: [config.universe],
-    iface: config.nic // <- BIND to the selected NIC IP!
-  });
+  receiver = new Receiver({}); // <- IMPORTANT: must pass empty {}
+
+  receiver.addUniverse(config.universe, config.nic); // Join universe + NIC manually
 
   receiver.on('packet', (packet) => {
+    console.log('Received sACN packet. DMX length:', packet.payload.length);
+
     const dmx = packet.payload;
 
     const fixtureData = patch.map((fixture, index) => {
