@@ -6,20 +6,21 @@ const WebSocket = require('ws');
 const wss = new WebSocket.Server({ server });
 const fs = require('fs');
 const path = require('path');
-//const sACNReceiver = require('sacn-js'); // Assuming you're using sacn-js or similar
+const os = require('os');
+const { Receiver } = require('sacn'); // <- IMPORTANT: using 'sacn' package!
 
 let config = {
-  nic: '',
+  nic: '127.0.0.1',
   universe: 1
 };
 
-// Load fixtures and patch
+// Load Patch
 const patchFilePath = path.join(__dirname, 'patch', 'patch.json');
 const patch = JSON.parse(fs.readFileSync(patchFilePath, 'utf-8'));
 
+// Load all fixture configs
 const fixtureConfigs = {};
 const fixturesFolder = path.join(__dirname, 'fixtures');
-
 for (const fixtureType of fs.readdirSync(fixturesFolder)) {
   const configPath = path.join(fixturesFolder, fixtureType, 'config.json');
   if (fs.existsSync(configPath)) {
@@ -31,67 +32,99 @@ app.use(express.static('public'));
 app.use('/fixtures', express.static('fixtures'));
 app.use(express.json());
 
-// API Routes
+// NIC listing (only TEST SIGNAL for now)
 app.get('/nics', (req, res) => {
-  // TODO: You might already have NIC discovery, otherwise mock it
-  res.json([{ name: 'Default NIC', address: '127.0.0.1' }]);
+  const interfaces = os.networkInterfaces();
+  const nics = [{ name: 'TEST SIGNAL', address: '127.0.0.1' }]; // Add TEST SIGNAL manually
+
+  for (const name of Object.keys(interfaces)) {
+    for (const iface of interfaces[name]) {
+      if (iface.family === 'IPv4' && !iface.internal) {
+        nics.push({
+          name: `${name}`,
+          address: iface.address
+        });
+      }
+    }
+  }
+
+  res.json(nics);
 });
 
+// Get current config
 app.get('/config', (req, res) => {
   res.json(config);
 });
 
+// Update config (Apply button triggers this)
 app.post('/config', (req, res) => {
   config = req.body;
   console.log('Updated config:', config);
+  setupReceiver(); // Restart sACN receiver
   res.sendStatus(200);
-  // TODO: Restart or reconfigure sACN receiver
 });
 
-// WebSocket handling
+// WebSocket connection handling
 wss.on('connection', (ws) => {
-  console.log('New WebSocket connection');
+  console.log('New WebSocket client connected.');
 
-  // Send current patch to the client
   ws.send(JSON.stringify({
     type: 'patch',
     data: patch
   }));
-
-  // Optionally listen to client messages here if needed
 });
 
-// Simulate DMX data (replace this with real sACN listener)
-setInterval(() => {
-  const fakeDMX = new Array(512).fill(0).map(() => Math.floor(Math.random() * 256));
+// sACN Receiver setup
+let receiver;
+function setupReceiver() {
+  if (receiver) {
+    receiver.close();
+    console.log('Closed previous sACN receiver.');
+  }
 
-  const fixtureData = patch.map((fixture, index) => {
-    const start = fixture.address - 1; // DMX addresses are 1-indexed
-    const footprint = fixtureConfigs[fixture.fixtureType]?.footprint || 10; // fallback footprint 10
-    const dmxSlice = fakeDMX.slice(start, start + footprint);
-
-    return {
-      id: `fixture-${index + 1}`,
-      fixtureType: fixture.fixtureType,
-      dmx: dmxSlice
-    };
+  receiver = new Receiver({
+    universes: [config.universe],
+    iface: config.nic // <- BIND to the selected NIC IP!
   });
 
-  wss.clients.forEach(client => {
-    if (client.readyState === WebSocket.OPEN) {
-      client.send(JSON.stringify({
-        type: 'update',
-        fixtures: fixtureData
-      }));
+  receiver.on('packet', (packet) => {
+    const dmx = packet.payload;
 
-      // Heartbeat
-      client.send(JSON.stringify({
-        type: 'dmx_heartbeat'
-      }));
-    }
+    const fixtureData = patch.map((fixture, index) => {
+      const start = fixture.address - 1;
+      const footprint = fixtureConfigs[fixture.fixtureType]?.footprint || 10;
+      const dmxSlice = dmx.slice(start, start + footprint);
+
+      return {
+        id: `fixture-${index + 1}`,
+        fixtureType: fixture.fixtureType,
+        dmx: dmxSlice
+      };
+    });
+
+    wss.clients.forEach(client => {
+      if (client.readyState === WebSocket.OPEN) {
+        client.send(JSON.stringify({
+          type: 'update',
+          fixtures: fixtureData
+        }));
+
+        client.send(JSON.stringify({
+          type: 'dmx_heartbeat'
+        }));
+      }
+    });
   });
-}, 100); // Send DMX updates every 100ms
-  
+
+  receiver.on('error', (err) => {
+    console.error('sACN Receiver error:', err);
+  });
+
+  console.log(`sACN Receiver listening on NIC ${config.nic} Universe ${config.universe}`);
+}
+
+// Initial startup
+setupReceiver();
 
 const PORT = process.env.PORT || 3000;
 server.listen(PORT, () => {
