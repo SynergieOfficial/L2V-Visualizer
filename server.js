@@ -85,10 +85,15 @@ function setupReceiver() {
   udpSocket.on('listening', () => {
     const address = udpSocket.address();
     console.log(`UDP Socket listening on ${address.address}:${address.port}`);
-
+  
     const multicastAddress = universeToMulticastAddress(config.universe);
-    udpSocket.addMembership(multicastAddress);
-    console.log(`Joined multicast group ${multicastAddress}`);
+  
+    try {
+      udpSocket.addMembership(multicastAddress, config.nic);
+      console.log(`Joined multicast group ${multicastAddress} on NIC ${config.nic}`);
+    } catch (err) {
+      console.error('Failed to join multicast group:', err);
+    }
   });
 
   udpSocket.on('message', (msg) => {
