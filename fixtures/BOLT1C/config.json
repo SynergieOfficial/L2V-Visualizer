@@ -1,0 +1,8 @@
+{
+  "channels": 40,
+  "attributes": {
+    "intensity": {
+      "offset": 1
+    }
+  }
+}

@@ -1,0 +1,44 @@
+body {
+  background: black;
+  color: white;
+  font-family: sans-serif;
+  margin: 0;
+}
+
+#settings-icon {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  font-size: 24px;
+  cursor: pointer;
+  z-index: 1000;
+  transition: opacity 0.5s ease;
+}
+
+#settings-icon.hidden {
+  opacity: 0;
+}
+
+#settings-modal {
+  display: none;
+  position: absolute;
+  top: 50px;
+  right: 10px;
+  background: white;
+  color: black;
+  padding: 15px;
+  border-radius: 8px;
+  z-index: 1000;
+}
+
+#fixture1 {
+  margin: 100px 50px;
+  width: 100px;
+  height: 100px;
+  background-color: #111;
+  border: 2px solid #555;
+}
+
+.fixture {
+  float: left;
+}
