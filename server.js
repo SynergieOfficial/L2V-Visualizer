@@ -82,9 +82,11 @@ function setupReceiver() {
     console.log('Closed previous sACN receiver.');
   }
 
-  receiver = new Receiver({}); // <- IMPORTANT: must pass empty {}
-
-  receiver.addUniverse(config.universe, config.nic); // Join universe + NIC manually
+  receiver = new Receiver({
+    universes: [config.universe], // simple!
+    port: 5568,
+    reuseAddr: true
+  });
 
   receiver.on('packet', (packet) => {
     console.log('Received sACN packet. DMX length:', packet.payload.length);
@@ -121,7 +123,7 @@ function setupReceiver() {
     console.error('sACN Receiver error:', err);
   });
 
-  console.log(`sACN Receiver listening on NIC ${config.nic} Universe ${config.universe}`);
+  console.log(`sACN Receiver listening on ANY NIC Universe ${config.universe}`);
 }
 
 // Initial startup
