@@ -170,6 +170,18 @@ function universeToMulticastAddress(universe) {
 // Start server
 setupReceiver();
 
+app.post('/patch', express.json(), (req, res) => {
+  patch = req.body;
+  console.log('Patch updated:', patch);
+  res.json({ status: 'ok' });
+});
+
+app.post('/save-patch', (req, res) => {
+  const fs = require('fs');
+  fs.writeFileSync(path.join(__dirname, 'patch/patch.json'), JSON.stringify(patch, null, 2));
+  res.json({ status: 'ok' });
+});
+
 const PORT = process.env.PORT || 3000;
 server.listen(PORT, () => {
   console.log(`Server running on http://localhost:${PORT}`);

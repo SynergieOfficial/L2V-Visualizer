@@ -164,6 +164,12 @@ function addFixtureToPatch() {
 
   localPatch.push(fixture);
 
+  fetch('/patch', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(localPatch)
+  });
+
   loadFixture(fixture);
   updatePatchListTable();
 }

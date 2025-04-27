@@ -43,6 +43,13 @@ body {
   float: left;
 }
 
+#fixture-container {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 10px;
+  padding: 20px;
+}
+
 #add-fixture-controls {
   display: flex;
   align-items: center;
