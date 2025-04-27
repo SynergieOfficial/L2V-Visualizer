@@ -97,36 +97,49 @@ function setupReceiver() {
   });
 
   udpSocket.on('message', (msg) => {
-    // sACN has a 126 byte header before DMX data
-    if (msg.length > 126) {
-      const dmxData = msg.slice(126); // Extract DMX data payload
-      console.log(`Received DMX data: ${dmxData.length} bytes`);
-
-      const fixtureData = patch.map((fixture, index) => {
-        const start = fixture.address - 1;
-        const footprint = fixtureConfigs[fixture.fixtureType]?.footprint || 10;
-        const dmxSlice = dmxData.slice(start, start + footprint);
-
-        return {
-          id: `fixture-${index + 1}`,
-          fixtureType: fixture.fixtureType,
-          dmx: Array.from(dmxSlice)
-        };
-      });
-
-      wss.clients.forEach(client => {
-        if (client.readyState === WebSocket.OPEN) {
-          client.send(JSON.stringify({
-            type: 'update',
-            fixtures: fixtureData
-          }));
-
-          client.send(JSON.stringify({
-            type: 'dmx_heartbeat'
-          }));
-        }
-      });
-    }
+    // Calculate DMX buffer
+    const dmxData = msg.slice(126); // Skip sACN headers, get DMX payload
+    if (!dmxData || dmxData.length === 0) return;
+  
+    // Prepare the fixture updates
+    const fixturesToSend = patch.map(fixture => {
+      const config = fixtureConfigs[fixture.fixtureType];
+      if (!config) return null;
+  
+      const start = fixture.address - 1; // DMX address is 1-indexed
+      const end = start + config.footprint;
+  
+      const fixtureDMX = [];
+      for (let i = start; i < end; i++) {
+        fixtureDMX.push(dmxData[i] || 0);
+      }
+  
+      return {
+        id: fixture.id || `fixture-${fixture.address}`,
+        fixtureType: fixture.fixtureType,
+        address: fixture.address,   // 🔥 Add address field here
+        dmx: fixtureDMX
+      };
+    }).filter(f => f !== null);
+  
+    // Broadcast to all WebSocket clients
+    wss.clients.forEach(client => {
+      if (client.readyState === WebSocket.OPEN) {
+        client.send(JSON.stringify({
+          type: 'update',
+          fixtures: fixturesToSend
+        }));
+      }
+    });
+  
+    // Also send heartbeat to frontend
+    wss.clients.forEach(client => {
+      if (client.readyState === WebSocket.OPEN) {
+        client.send(JSON.stringify({
+          type: 'dmx_heartbeat'
+        }));
+      }
+    });
   });
 
   udpSocket.on('error', (err) => {
