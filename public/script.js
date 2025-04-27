@@ -142,23 +142,36 @@ function loadFixture(type, address) {
 
 function processDMXUpdate(fixtures) {
   fixtures.forEach(({ id, dmx }) => {
-    const el = document.getElementById(id);
-    if (!el) return;
+    // find the outer wrapper for this fixture
+    const wrapper = document.getElementById(id);
+    if (!wrapper) return;
 
-    let config = el.dataset.config;
+    // parse the per-fixture config we stashed on the wrapper
+    let config = wrapper.dataset.config;
     if (typeof config === 'string') {
       config = JSON.parse(config);
     }
 
-    config?.attributes?.forEach(attr => {
-      const start = attr.startChannel - 1;
-      if (attr.type === 'RGB') {
-        applyRGB(el, dmx.slice(start, start + 3));
-      } else if (attr.type === 'Intensity') {
-        applyIntensity(el, dmx[start]);
-      } else if (attr.type === 'Frost') {
-        applyFrost(el, dmx[start]);
-      }
+    // for each DMX attribute in the config
+    config.attributes.forEach(attr => {
+      // DMX channels are 1-based, so subtract 1
+      const start = attr.channel - 1;
+      const type  = String(attr.type).toLowerCase();
+
+      // apply to each inner element ID listed in config.elements
+      attr.elements.forEach(elemId => {
+        // scope the query inside this wrapper
+        const el = wrapper.querySelector(`#${elemId}`);
+        if (!el) return;
+
+        if (type === 'rgb') {
+          applyRGB(el, dmx.slice(start, start + 3));
+        } else if (type === 'intensity') {
+          applyIntensity(el, dmx[start]);
+        } else if (type === 'frost') {
+          applyFrost(el, dmx[start]);
+        }
+      });
     });
   });
 }
