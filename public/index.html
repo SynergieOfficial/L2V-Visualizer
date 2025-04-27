@@ -16,18 +16,25 @@
     <input type="number" id="universe" value="1" min="1">
     <button onclick="applySettings()">Apply</button>
     <div id="sacn-status">Status: 🔴 Waiting</div>
+    <h3>Add Fixture</h3>
+    <div id="add-fixture-controls">
+      <select id="fixture-type-select"></select>
+      <input id="fixture-address-input" type="number" min="1" placeholder="Start Address">
+      <button id="add-fixture-btn">Add Fixture</button>
+    </div>
+
     <h3>Current Patch</h3>
-      <table id="patch-list">
-        <thead>
-          <tr>
-            <th>Fixture Type</th>
-            <th>Start Address</th>
-          </tr>
-        </thead>
-        <tbody id="patch-list-body">
-            <!-- Fixture rows will be inserted here by JS -->
-        </tbody>
-      </table>
+    <table id="patch-list">
+      <thead>
+        <tr>
+          <th>Fixture Type</th>
+          <th>Start Address</th>
+        </tr>
+      </thead>
+      <tbody id="patch-list-body">
+        <!-- Fixtures filled dynamically -->
+      </tbody>
+    </table>
   </div>
   <div id="fixture-container"></div>
   <script src="script.js"></script>
