@@ -1,4 +1,4 @@
-// Fully integrated and fixed script.js for L2V-Visualizer (Scope 0.5.11 Patch Final)
+// Corrected script.js according to repo state and current requirements
 
 let ws;
 let patch = [];
@@ -6,30 +6,22 @@ let fixtureTypes = [];
 let sacnConnected = false;
 
 window.onload = () => {
-  setupSettingsMenu();
   fetchFixtureTypes();
   loadPatch();
+
+  document.getElementById('settings-icon').addEventListener('mouseenter', () => {
+    document.getElementById('settings-icon').classList.remove('hidden');
+  });
+
+  document.getElementById('settings-icon').addEventListener('mouseleave', () => {
+    setTimeout(() => {
+      document.getElementById('settings-icon').classList.add('hidden');
+    }, 5000);
+  });
 
   document.getElementById('add-fixture-btn').addEventListener('click', addFixture);
   document.getElementById('save-patch-btn').addEventListener('click', savePatchToDisk);
 };
-
-function setupSettingsMenu() {
-  const settingsIcon = document.getElementById('settings-icon');
-  const settingsModal = document.getElementById('settings-modal');
-
-  settingsIcon.addEventListener('mouseenter', () => {
-    settingsIcon.classList.remove('hidden');
-  });
-
-  settingsIcon.addEventListener('mouseleave', () => {
-    setTimeout(() => settingsIcon.classList.add('hidden'), 5000);
-  });
-
-  settingsIcon.addEventListener('click', () => {
-    settingsModal.style.display = settingsModal.style.display === 'block' ? 'none' : 'block';
-  });
-}
 
 function applySettings() {
   const nic = document.getElementById('nic').value;
@@ -50,14 +42,10 @@ function applySettings() {
       updateStatus(data.connected);
     } else if (data.type === 'update') {
       processDMXUpdate(data.fixtures);
+    } else if (data.type === 'nics') {
+      populateNICDropdown(data.nics);
     }
   };
-}
-
-function updateStatus(connected) {
-  sacnConnected = connected;
-  const statusEl = document.getElementById('sacn-status');
-  statusEl.innerHTML = connected ? 'Status: 🟢 Connected' : 'Status: 🔴 Waiting';
 }
 
 function fetchFixtureTypes() {
@@ -70,11 +58,21 @@ function fetchFixtureTypes() {
       types.forEach(type => {
         const option = document.createElement('option');
         option.value = type;
-        option.textContent = type;
+        option.innerText = type;
         select.appendChild(option);
       });
-    })
-    .catch(err => console.error('[Client] Failed to fetch fixture types:', err));
+    });
+}
+
+function populateNICDropdown(nics) {
+  const nicSelect = document.getElementById('nic');
+  nicSelect.innerHTML = '';
+  nics.forEach(nic => {
+    const option = document.createElement('option');
+    option.value = nic;
+    option.textContent = nic;
+    nicSelect.appendChild(option);
+  });
 }
 
 function loadPatch() {
@@ -83,9 +81,24 @@ function loadPatch() {
     .then(data => {
       patch = data;
       renderPatchTable();
-      patch.forEach(fixture => loadFixture(fixture.fixtureType, fixture.address));
+      patch.forEach(({ fixtureType, address }) => {
+        loadFixture(fixtureType, address);
+      });
     })
-    .catch(err => console.error('[Client] Failed to load patch.json:', err));
+    .catch(err => {
+      console.error('[Client] Failed to load patch.json:', err);
+    });
+}
+
+function addFixture() {
+  const type = document.getElementById('fixture-type-select').value;
+  const address = parseInt(document.getElementById('fixture-address-input').value);
+
+  if (!type || isNaN(address)) return;
+
+  patch.push({ fixtureType: type, address });
+  renderPatchTable();
+  loadFixture(type, address);
 }
 
 function renderPatchTable() {
@@ -98,20 +111,16 @@ function renderPatchTable() {
   });
 }
 
-function addFixture() {
-  const type = document.getElementById('fixture-type-select').value;
-  const address = parseInt(document.getElementById('fixture-address-input').value);
-  if (!type || isNaN(address)) return;
-
-  patch.push({ fixtureType: type, address });
-  renderPatchTable();
-  loadFixture(type, address);
-}
-
 function savePatchToDisk() {
   if (ws && ws.readyState === WebSocket.OPEN) {
     ws.send(JSON.stringify({ type: 'save', patch }));
   }
+}
+
+function updateStatus(connected) {
+  sacnConnected = connected;
+  const status = document.getElementById('sacn-status');
+  status.innerHTML = connected ? 'Status: 🟢 Connected' : 'Status: 🔴 Waiting';
 }
 
 function loadFixture(type, address) {
@@ -121,59 +130,51 @@ function loadFixture(type, address) {
     fetch(`/fixtures/${type}/config.json`).then(res => res.json())
   ]).then(([html, css, config]) => {
     const container = document.getElementById('fixture-container');
-    const fixtureWrapper = document.createElement('div');
+    const wrapper = document.createElement('div');
+    wrapper.id = `fixture-${address}`;
+    wrapper.dataset.address = address;
+    wrapper.dataset.fixtureType = type;
+    wrapper.dataset.config = JSON.stringify(config);
+    wrapper.innerHTML = html;
+    container.appendChild(wrapper);
 
-    fixtureWrapper.id = `fixture-${address}`;
-    fixtureWrapper.dataset.address = address;
-    fixtureWrapper.dataset.fixtureType = type;
-    fixtureWrapper.dataset.config = JSON.stringify(config);
-
-    fixtureWrapper.innerHTML = html;
-    container.appendChild(fixtureWrapper);
-
-    const styleTag = document.createElement('style');
-    styleTag.innerHTML = css;
-    document.head.appendChild(styleTag);
-
-    console.log(`[Client] Loaded fixture ${type} at address ${address}`);
-  }).catch(err => console.error(`[Client] Failed loading fixture ${type}:`, err));
+    const style = document.createElement('style');
+    style.innerHTML = css;
+    document.head.appendChild(style);
+  }).catch(err => console.error('[Client] Failed to load fixture:', err));
 }
 
 function processDMXUpdate(fixtures) {
   fixtures.forEach(({ id, dmx }) => {
-    const fixtureEl = document.getElementById(id);
-    if (!fixtureEl) return;
+    const wrapper = document.getElementById(id);
+    if (!wrapper) return;
+    const config = JSON.parse(wrapper.dataset.config || '{}');
 
-    const config = JSON.parse(fixtureEl.dataset.config || '{}');
-    if (!config.attributes) return;
-
-    config.attributes.forEach(attr => {
+    config.attributes?.forEach(attr => {
       if (attr.type === 'RGB') {
-        const rgb = dmx.slice(attr.startChannel - 1, attr.startChannel + 2);
-        applyRGB(fixtureEl, rgb);
+        applyRGB(wrapper.querySelector(`#${attr.elementId}`), dmx.slice(attr.startChannel - 1, attr.startChannel + 2));
       } else if (attr.type === 'Intensity') {
-        const intensity = dmx[attr.startChannel - 1];
-        applyIntensity(fixtureEl, intensity);
+        applyIntensity(wrapper.querySelector(`#${attr.elementId}`), dmx[attr.startChannel - 1]);
       } else if (attr.type === 'Frost') {
-        const frost = dmx[attr.startChannel - 1];
-        applyFrost(fixtureEl, frost);
+        applyFrost(wrapper.querySelector(`#${attr.elementId}`), dmx[attr.startChannel - 1]);
       }
     });
   });
 }
 
-function applyRGB(el, [r, g, b]) {
-  if (r === undefined || g === undefined || b === undefined) return;
+function applyRGB(el, channels) {
+  if (!el || !channels) return;
+  const [r, g, b] = channels;
   el.style.backgroundColor = `rgb(${r}, ${g}, ${b})`;
-  el.style.boxShadow = `0 0 20px 15px rgba(${r}, ${g}, ${b}, 0.5)`;
+  el.style.boxShadow = `rgba(${r}, ${g}, ${b}, 0.5) 0px 0px 20px 15px`;
 }
 
 function applyIntensity(el, value) {
-  if (value === undefined) return;
+  if (!el || value === undefined) return;
   el.style.opacity = value / 255;
 }
 
 function applyFrost(el, value) {
-  if (value === undefined) return;
+  if (!el || value === undefined) return;
   el.style.filter = `blur(${value / 25}px)`;
 }
