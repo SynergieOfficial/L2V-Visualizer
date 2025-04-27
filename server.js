@@ -1,52 +1,34 @@
-// Preparing the correct server.js and script.js fixes based on your repo
-
-// === server.js (full fixed version) ===
-const express = require('express');
-const fs = require('fs');
-const os = require('os');
-const path = require('path');
-const http = require('http');
+const express   = require('express');
+const fs        = require('fs');
+const os        = require('os');
+const path      = require('path');
+const http      = require('http');
 const WebSocket = require('ws');
-const dgram = require('dgram');
+const dgram     = require('dgram');
 
-const app = express();
+const app    = express();
 const server = http.createServer(app);
-const wss = new WebSocket.Server({ server });
+const wss    = new WebSocket.Server({ server });
 
-const PORT = 3000;
+const PORT      = 3000;
 const SACN_PORT = 5568;
 
 let outputFixtures = [];
-let universe = 1;
-let nic = '127.0.0.1';
-
+let universe       = 1;
+let nic            = '127.0.0.1';
 let udpSocket;
 
+/** Serve static files */
 app.use(express.static('public'));
-
-// Serve fixtures and patch folder
 app.use('/fixtures', express.static(path.join(__dirname, 'fixtures')));
 app.use(express.static(__dirname));
 
+/** List available NICs */
 app.get('/nics', (req, res) => {
   const interfaces = os.networkInterfaces();
   const nics = [{ name: 'TEST SIGNAL', address: '127.0.0.1' }];
   for (const [name, list] of Object.entries(interfaces)) {
-    list.forEach(iface => {
-      if (iface.family === 'IPv4' && !iface.internal) {
-        nics.push({ name, address: iface.address });
-      }
-    });
-  }
-  res.json(nics);
-});
-
-// API to get available NICs
-app.get('/nics', (req, res) => {
-  const interfaces = os.networkInterfaces();
-  const nics = [{ name: 'TEST SIGNAL', address: '127.0.0.1' }];
-  for (const name in interfaces) {
-    for (const iface of interfaces[name]) {
+    for (const iface of list) {
       if (iface.family === 'IPv4' && !iface.internal) {
         nics.push({ name, address: iface.address });
       }
@@ -55,66 +37,61 @@ app.get('/nics', (req, res) => {
   res.json(nics);
 });
 
-// API to get fixture types
+/** List fixture types */
 app.get('/fixtures', (req, res) => {
   const fixturesPath = path.join(__dirname, 'fixtures');
   fs.readdir(fixturesPath, (err, files) => {
-    if (err) {
-      res.json([]);
-    } else {
-      const types = files.filter(file => fs.statSync(path.join(fixturesPath, file)).isDirectory());
-      res.json(types);
-    }
+    if (err) return res.json([]);
+    const types = files.filter(f =>
+      fs.statSync(path.join(fixturesPath, f)).isDirectory()
+    );
+    res.json(types);
   });
 });
 
-wss.on('connection', (ws) => {
-  console.log('New WebSocket client connected.');
-
-  ws.on('message', (message) => {
-    const data = JSON.parse(message);
-    if (data.type === 'connect') {
-      nic = data.nic;
-      universe = parseInt(data.universe);
+/** WebSocket handshake & commands */
+wss.on('connection', ws => {
+  ws.on('message', raw => {
+    const msg = JSON.parse(raw);
+    if (msg.type === 'connect') {
+      nic = msg.nic;
+      universe = parseInt(msg.universe, 10);
       setupReceiver();
       ws.send(JSON.stringify({ type: 'status', connected: true }));
-    } else if (data.type === 'save') {
-      fs.writeFileSync('patch.json', JSON.stringify(data.patch, null, 2));
-      console.log('Patch saved to disk.');
+    } else if (msg.type === 'save') {
+      fs.writeFileSync('patch.json', JSON.stringify(msg.patch, null, 2));
     }
   });
 });
 
+/** Open the sACN receiver on the chosen NIC/universe */
 function setupReceiver() {
-  if (udpSocket) {
-    udpSocket.close();
-  }
+  if (udpSocket) udpSocket.close();
   udpSocket = dgram.createSocket('udp4');
-
   udpSocket.bind(SACN_PORT, () => {
     udpSocket.setBroadcast(true);
     udpSocket.setMulticastTTL(128);
-    udpSocket.addMembership(`239.255.${(universe >> 8) & 0xff}.${universe & 0xff}`, nic);
-    console.log(`UDP Socket listening on ${nic}:${SACN_PORT}`);
+    udpSocket.addMembership(
+      `239.255.${(universe >> 8) & 0xff}.${universe & 0xff}`,
+      nic
+    );
   });
-
-  udpSocket.on('message', (msg) => {
-    const dmxData = parseSacn(msg);
-    if (!dmxData) return;
-    
-    wss.clients.forEach((client) => {
-      if (client.readyState === WebSocket.OPEN) {
-        client.send(JSON.stringify({ type: 'update', fixtures: dmxData }));
+  udpSocket.on('message', packet => {
+    const data = parseSacn(packet);
+    if (!data) return;
+    wss.clients.forEach(c => {
+      if (c.readyState === WebSocket.OPEN) {
+        c.send(JSON.stringify({ type: 'update', fixtures: data }));
       }
     });
   });
 }
 
+/** Stub parser—replace with real sACN decoding later */
 function parseSacn(packet) {
-  // Dummy parser for now - customize based on real SACN parsing
-  return outputFixtures.map(({ address, fixtureType }) => ({
+  return outputFixtures.map(({ address }) => ({
     id: `fixture-${address}`,
-    dmx: new Array(512).fill(0),
+    dmx: new Array(512).fill(0)
   }));
 }
 
