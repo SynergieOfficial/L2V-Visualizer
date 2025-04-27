@@ -53,6 +53,16 @@ app.get('/nics', (req, res) => {
   res.json(nics);
 });
 
+app.get('/fixtures', (req, res) => {
+  const fs = require('fs');
+  const fixturesDir = path.join(__dirname, 'fixtures');
+  const fixtureTypes = fs.readdirSync(fixturesDir).filter(name => {
+    const fullPath = path.join(fixturesDir, name);
+    return fs.lstatSync(fullPath).isDirectory();
+  });
+  res.json(fixtureTypes);
+});
+
 // Config handling
 app.get('/config', (req, res) => {
   res.json(config);

@@ -152,6 +152,80 @@ fetch('/nics')
     });
   });
 
+let localPatch = []; // Local patch array for dynamic adding
+
+// Fetch available fixture types
+function fetchFixtureTypes() {
+  fetch('/fixtures')
+    .then(res => res.json())
+    .then(fixtureTypes => {
+      const select = document.getElementById('fixture-type-select');
+      fixtureTypes.forEach(type => {
+        const option = document.createElement('option');
+        option.value = type;
+        option.textContent = type;
+        select.appendChild(option);
+      });
+    });
+}
+
+// Update Patch List Table
+function updatePatchListTable() {
+  const tbody = document.getElementById('patch-list-body');
+  tbody.innerHTML = ''; // Clear table
+  localPatch.forEach(fixture => {
+    const row = document.createElement('tr');
+    const typeCell = document.createElement('td');
+    const addressCell = document.createElement('td');
+    typeCell.textContent = fixture.fixtureType;
+    addressCell.textContent = fixture.address;
+    row.appendChild(typeCell);
+    row.appendChild(addressCell);
+    tbody.appendChild(row);
+  });
+}
+
+// Add Fixture to Local Patch
+function addFixtureToPatch() {
+  const type = document.getElementById('fixture-type-select').value;
+  const address = parseInt(document.getElementById('fixture-address-input').value, 10);
+
+  if (!type || isNaN(address) || address <= 0) {
+    alert('Please select a fixture type and enter a valid address.');
+    return;
+  }
+
+  const fixture = {
+    fixtureType: type,
+    address: address,
+    id: `fixture-${address}`
+  };
+
+  localPatch.push(fixture);
+
+  // Load and inject fixture into DOM
+  loadFixture(fixture);
+
+  // Update Table
+  updatePatchListTable();
+}
+
+// Setup Event Listener
+document.getElementById('add-fixture-btn').addEventListener('click', addFixtureToPatch);
+
+// Extend Existing Patch Load
+fetch('/patch/patch.json')
+  .then(res => res.json())
+  .then(patch => {
+    localPatch = patch;
+    updatePatchListTable();
+    // Also load fixtures already in patch
+    patch.forEach(loadFixture);
+  });
+
+// Fetch fixtures on page load
+fetchFixtureTypes();
+
 const icon = document.getElementById('settings-icon');
 const modal = document.getElementById('settings-modal');
 let hideTimer;
