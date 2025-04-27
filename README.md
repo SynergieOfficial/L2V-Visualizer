@@ -1,4 +1,4 @@
-# 🎧 L2V-Visualizer
+# Q2LED-Visualizer
 
 ## Scope
 
@@ -63,51 +63,101 @@ Client Applies Live Visual Changes (RGB, Frost, Intensity)
 
 ---
 
-## 🚀 Project Evolution
+# L2V Visualizer
 
-| Version | Description |
-|:--------|:------------|
-| V0.1 | Simple NIC and Universe Settings. Background Color controlled by DMX. |
-| V0.2 | Settings Cog + Modal with Hide-on-Idle behavior. |
-| V0.3 | Fixture Type System: Dynamic Fixture Loading (HTML, CSS, Config). |
-| V0.3.1 | Modular folder structure for fixtures. |
-| V0.3.2 | BOLT1C fixture added with full plate and beam mapping. |
-| V0.4.1 | sACN Status Indicator added. |
-| V0.4.2 | Settings Persistence: NIC + Universe save and load. |
-| V0.4.3 | Refined Cog Auto-Hide Behavior. |
-| V0.5 | Start full Patch System (remove hardcoded fixtures). |
-| V0.5.8 | Dynamic Address-Based DMX Slicing. Real DMX patching finalized. TestSquare and BOLT1C fully live-controlled. |
+A web-based visualizer for sACN DMX lighting systems.
 
----
+## Project Purpose
+This project aims to provide a scalable and responsive visual representation of a lighting rig, driven in real-time by sACN DMX data.
 
-## 📋 How To Run
-
-1. Install Node.js and NPM
-2. Install dependencies:
-
+## Setup Instructions
+1. Install dependencies:
 ```bash
 npm install
 ```
-
-3. Start server:
-
+2. Start the server:
 ```bash
 node server.js
 ```
+3. Access the client:
+Open `http://localhost:3000` in your web browser.
 
-4. Open browser:
+## Folder Structure
+- `/Fixtures/`: Contains folders for each fixture type (HTML, CSS, and configuration files).
+- `/Patch/patch.json`: Stores the current patch list.
+- `server.js`: Node.js backend that handles sACN, WebSocket server, and file serving.
+- `script.js`: Frontend logic for managing fixtures, settings, and receiving sACN updates.
+- `style.css`: Base styling.
 
-```
-http://localhost:3000
-```
+## Version History
 
-5. Apply NIC + Universe via UI
-6. Start sending sACN DMX to the server
-7. Watch virtual fixtures react live 🞧
+### v0.5.0 - Initial Visualizer Setup
+- WebSocket server and client communication.
+- Basic sACN receiver (UDP socket on port 5568).
+- Background color visualization via DMX RGB.
+
+### v0.5.1 - Settings Menu
+- NIC selection dropdown.
+- Universe input field.
+- Apply button to connect to the sACN network.
+- sACN status indicator.
+
+### v0.5.2 - Patch System Started
+- Read patch list from `patch.json`.
+- Render patch table inside the settings modal.
+
+### v0.5.3 - Fixture Rendering System
+- Support for fixture templates and CSS loading based on type.
+- Dynamic rendering of fixtures based on patch.
+
+### v0.5.4 - Attribute Application System
+- Basic attributes implemented:
+  - Intensity (opacity)
+  - RGB (background color)
+  - Frost (blur)
+
+### v0.5.5 - Improved Patch and Fixtures
+- Added TestSquare fixture.
+- Added BOLT1C fixture with full attribute mapping.
+
+### v0.5.6 - Clean UI Improvements
+- Black background.
+- Responsive scaling of fixture layout.
+- Settings button hiding and hover behavior.
+
+### v0.5.7 - Server & Client Stability
+- Organized server code structure.
+- Improved error handling.
+- Ensured reconnect behavior for WebSocket.
+
+### v0.5.8 - Patch Saving
+- Button to save the current patch into `/Patch/patch.json`.
+- Added WebSocket server command to handle patch saving.
+
+### v0.5.9 - Minor Visual Improvements
+- Patch table formatting.
+- NIC and Universe fields styled.
+- Confirmed working patch display.
+
+### v0.5.10 - Adding Fixtures from Frontend
+- Dropdown to select fixture type from available fixtures.
+- Input field for address.
+- Add button to dynamically add a new fixture.
+- Updated patch table live.
+
+### v0.5.11 - Patch & Fixture Stability (Current Work)
+- Improved fixture dynamic rendering.
+- Refactored DMX update handling based on fixture config.
+- Correct loading of patch from `/Patch/patch.json`.
+- Rebuild of WebSocket message system.
+- Critical bug: Fixtures are rendered visually but do not respond to sACN DMX updates yet.
+
+## Known Issues
+- Fixtures render but attributes do not update from DMX frames (working on it!).
+- Settings menu may need some small CSS/JS improvements for better UX.
 
 ---
 
-👉 You are now running a festival-grade visualizer, ready to expand fixture libraries, patch grids, and extend your lighting creativity!
+> Next Step: Finish v0.5.11 patching and fully restore sACN visual updates to fixtures.
 
----
 
