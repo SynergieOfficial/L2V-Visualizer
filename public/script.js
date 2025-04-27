@@ -80,7 +80,7 @@ function handleDMXUpdate(fixtures) {
     if (!config || !config.attributes) return;
 
     const dmx = fx.dmx;
-
+    console.log("Handling fixture:", fx);
     config.attributes.forEach(attr => {
       const type = attr.type;
       const startCh = attr.channel - 1; // DMX is 1-indexed
@@ -113,6 +113,7 @@ function handleDMXUpdate(fixtures) {
       });
     });
   });
+  
 }
 
 fetch('/nics')
