@@ -89,12 +89,16 @@ function loadPatch() {
 function addFixture() {
   const type = document.getElementById('fixture-type-select').value;
   const address = parseInt(document.getElementById('fixture-address-input').value);
-
   if (!type || isNaN(address)) return;
 
   patch.push({ fixtureType: type, address });
   renderPatchTable();
   loadFixture(type, address);
+
+  // ← new: let the server know right away
+  if (ws && ws.readyState === WebSocket.OPEN) {
+    ws.send(JSON.stringify({ type: 'save', patch }));
+  }
 }
 
 function renderPatchTable() {
@@ -189,10 +193,12 @@ function applyIntensity(el, value) {
 }
 
 function applyFrost(el, value) {
+  // if no frost data or zero, clear any glow/blur
   if (value === undefined || value <= 0) {
     el.style.filter = '';
     return;
   }
+  // otherwise apply a blur-based “glow”
   el.style.filter = `blur(${value / 25}px)`;
 }
 
