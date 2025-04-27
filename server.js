@@ -13,7 +13,6 @@ const server = http.createServer(app);
 const wss = new WebSocket.Server({ server });
 
 app.use(express.static('public'));
-app.use(express.static('public'));
 app.use('/fixtures', express.static(path.join(__dirname, 'fixtures')));
 app.use(express.json());
 
@@ -23,7 +22,7 @@ let config = {
   universe: 1
 };
 let udpSocket;
-let lastDmxTimestamp = Date.now();
+let lastDmxTimestamp = 0;
 
 // List NICs
 app.get('/nics', (req, res) => {
@@ -57,7 +56,7 @@ app.post('/config', (req, res) => {
     console.log('Closed previous UDP socket.');
   }
 
-  setupReceiver(); // Start fresh with new NIC and Universe after Apply
+  setupReceiver();
   res.json({ status: 'ok' });
 });
 
