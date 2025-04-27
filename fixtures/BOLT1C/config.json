@@ -28,17 +28,23 @@
     {
       "type": "intensity",
       "channel": 2,
-      "elements": ["BOLT1C-Main"]
+      "elements": [
+        "BOLT1C-Main"
+      ]
     },
     {
       "type": "rgb",
       "channel": 9,
-      "elements": ["BOLT1C-Plate-1"]
+      "elements": [
+        "BOLT1C-Plate-1"
+      ]
     },
     {
       "type": "rgb",
       "channel": 13,
-      "elements": ["BOLT1C-Plate-2"]
+      "elements": [
+        "BOLT1C-Plate-2"
+      ]
     },
     {
       "type": "intensity",
@@ -67,57 +73,57 @@
     },
     {
       "type": "intensity",
-      "channel": 23,
+      "channel": 22,
       "elements": ["BOLT1C-Beam-6"]
     },
     {
       "type": "intensity",
-      "channel": 24,
+      "channel": 23,
       "elements": ["BOLT1C-Beam-7"]
     },
     {
       "type": "intensity",
-      "channel": 25,
+      "channel": 24,
       "elements": ["BOLT1C-Beam-8"]
     },
     {
       "type": "intensity",
-      "channel": 26,
+      "channel": 25,
       "elements": ["BOLT1C-Beam-9"]
     },
     {
       "type": "intensity",
-      "channel": 27,
+      "channel": 26,
       "elements": ["BOLT1C-Beam-10"]
     },
     {
       "type": "intensity",
-      "channel": 28,
+      "channel": 27,
       "elements": ["BOLT1C-Beam-11"]
     },
     {
       "type": "intensity",
-      "channel": 29,
+      "channel": 28,
       "elements": ["BOLT1C-Beam-12"]
     },
     {
       "type": "intensity",
-      "channel": 30,
+      "channel": 29,
       "elements": ["BOLT1C-Beam-13"]
     },
     {
       "type": "intensity",
-      "channel": 31,
+      "channel": 30,
       "elements": ["BOLT1C-Beam-14"]
     },
     {
       "type": "intensity",
-      "channel": 32,
+      "channel": 31,
       "elements": ["BOLT1C-Beam-15"]
     },
     {
       "type": "intensity",
-      "channel": 33,
+      "channel": 32,
       "elements": ["BOLT1C-Beam-16"]
     }
   ]
