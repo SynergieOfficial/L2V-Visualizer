@@ -3,7 +3,7 @@
 let ws;
 let sacnTimeout;
 let patch = [];
-const fixtureConfigs = {}; // New: Store loaded configs by fixture ID
+const fixtureConfigs = {}; // Store configs per fixture
 
 function connectWebSocket() {
   if (ws) ws.close();
@@ -124,7 +124,7 @@ async function loadFixture(fixture) {
   style.href = `/fixtures/${fixture.fixtureType}/style.css`;
   document.head.appendChild(style);
 
-  fixtureConfigs[wrapper.id] = config; // Save config by fixture ID
+  fixtureConfigs[wrapper.id] = config;
 }
 
 function renderPatchTable() {
@@ -170,6 +170,17 @@ fetch('/nics')
       opt.value = nic.address;
       opt.textContent = `${nic.name} (${nic.address})`;
       nicSelect.appendChild(opt);
+    });
+    return fetch('/fixtures');
+  })
+  .then(res => res.json())
+  .then(fixtures => {
+    const fixtureSelect = document.getElementById('fixture-type-select');
+    fixtures.forEach(name => {
+      const opt = document.createElement('option');
+      opt.value = name;
+      opt.textContent = name;
+      fixtureSelect.appendChild(opt);
     });
     return fetch('/config');
   })
