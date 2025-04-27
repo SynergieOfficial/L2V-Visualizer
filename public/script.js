@@ -124,7 +124,7 @@ async function loadFixture(fixture) {
   style.href = `/fixtures/${fixture.fixtureType}/style.css`;
   document.head.appendChild(style);
 
-  fixtureConfigs[wrapper.id] = config;
+  fixtureConfigs[wrapper.id] = config; // Fixed: load config for each fixture at startup
 }
 
 function renderPatchTable() {
