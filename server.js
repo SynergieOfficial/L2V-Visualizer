@@ -13,6 +13,8 @@ const server = http.createServer(app);
 const wss = new WebSocket.Server({ server });
 
 app.use(express.static('public'));
+app.use(express.static('public'));
+app.use('/fixtures', express.static(path.join(__dirname, 'fixtures')));
 app.use(express.json());
 
 let patch = require('./patch/patch.json');
