@@ -42,3 +42,39 @@ body {
 .fixture {
   float: left;
 }
+
+#add-fixture-controls {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 15px;
+}
+
+#add-fixture-controls select,
+#add-fixture-controls input,
+#add-fixture-controls button {
+  padding: 5px;
+  font-size: 14px;
+}
+
+#patch-list {
+  width: 100%;
+  border-collapse: collapse;
+  margin-top: 10px;
+}
+
+#patch-list th,
+#patch-list td {
+  border: 1px solid #aaa;
+  padding: 8px;
+  text-align: center;
+}
+
+#patch-list th {
+  background-color: #333;
+  color: white;
+}
+
+#patch-list tbody tr:nth-child(odd) {
+  background-color: #f0f0f0;
+}
