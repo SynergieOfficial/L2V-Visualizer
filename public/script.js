@@ -1,209 +1,148 @@
-// public/script.js
+// script.js (fully integrated, based on latest repo + fixes)
 
 let ws;
-let sacnTimeout;
-let patch = [];
-const fixtureConfigs = {}; // Store configs per fixture
+let outputFixtures = [];
+let fixtureTypes = [];
+let receiverSetup = false;
 
 function connectWebSocket() {
-  if (ws) ws.close();
   ws = new WebSocket(`ws://${location.host}`);
 
-  ws.onopen = () => console.log('WebSocket connected');
+  ws.onopen = () => {
+    console.log("[Client] WebSocket connected");
+  };
 
   ws.onmessage = async (event) => {
     const data = JSON.parse(event.data);
 
+    if (data.type === 'patch') {
+      console.log("[Client] Received patch:", data.patch);
+      outputFixtures = data.patch;
+      renderFixtures();
+      updatePatchTable();
+    }
+
+    if (data.type === 'fixtures') {
+      console.log("[Client] Received fixture types:", data.fixtures);
+      fixtureTypes = data.fixtures;
+      updateFixtureDropdown();
+    }
+
     if (data.type === 'update') {
       console.log("[Client] Received update DMX frame:", data.fixtures);
-      for (const fx of data.fixtures) {
-        console.log(`[Client] Processing fixture ID: ${fx.id}`);
-        const wrapper = document.getElementById(fx.id);
-        if (!wrapper) {
-          console.warn(`[Client] Wrapper not found for fixture ${fx.id}`);
-          continue;
-        }
-
-        const config = fixtureConfigs[fx.id];
-        if (!config) {
-          console.warn(`[Client] No config found for fixture ${fx.id}`);
-          continue;
-        }
-
-        for (const attribute of config.attributes) {
-          const el = wrapper.querySelector(`#${attribute.element}`);
-          console.log(`[Client] Applying ${attribute.type} to element ${attribute.element} with channels ${attribute.channels}`);
-          if (!el) continue;
-
-          const ch = attribute.channels;
-
-          if (attribute.type === 'Intensity' && fx.dmx[ch[0]] !== undefined) {
-            el.style.opacity = fx.dmx[ch[0]] / 255;
-          }
-
-          if (attribute.type === 'RGB' && fx.dmx[ch[0]] !== undefined) {
-            const r = fx.dmx[ch[0]] || 0;
-            const g = fx.dmx[ch[1]] || 0;
-            const b = fx.dmx[ch[2]] || 0;
-            el.style.backgroundColor = `rgb(${r},${g},${b})`;
-          }
-
-          if (attribute.type === 'Intensity+RGB' && fx.dmx[ch[0]] !== undefined) {
-            const intensity = fx.dmx[ch[0]] || 0;
-            const r = fx.dmx[ch[1]] || 0;
-            const g = fx.dmx[ch[2]] || 0;
-            const b = fx.dmx[ch[3]] || 0;
-            el.style.backgroundColor = `rgb(${r},${g},${b})`;
-            el.style.opacity = intensity / 255;
-          }
-
-          if (attribute.type === 'Frost' && fx.dmx[ch[0]] !== undefined) {
-            const frostValue = fx.dmx[ch[0]] || 0;
-            const frostOpacity = frostValue / 255 * 0.6;
-            const currentColor = window.getComputedStyle(el).backgroundColor;
-            el.style.boxShadow = `0px 0px 20px 15px ${currentColor.replace('rgb', 'rgba').replace(')', `,${frostOpacity})`)}`;
-          }
-        }
-      }
+      applyDMXData(data.fixtures);
     }
+  };
 
-    if (data.type === 'dmx_heartbeat') {
-      document.getElementById('sacn-status').innerHTML = data.status === 'connected' ? 'Status: 🟢 Connected' : 'Status: 🔴 Waiting';
-      clearTimeout(sacnTimeout);
-      if (data.status === 'connected') {
-        sacnTimeout = setTimeout(() => {
-          document.getElementById('sacn-status').innerHTML = 'Status: 🔴 Waiting';
-        }, 3000);
-      }
-    }
+  ws.onclose = () => {
+    console.log("[Client] WebSocket disconnected, retrying in 1s...");
+    setTimeout(connectWebSocket, 1000);
   };
 }
 
-function applySettings() {
-  const nic = document.getElementById('nic').value;
-  const universe = document.getElementById('universe').value;
-  fetch('/config', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ nic, universe })
-  }).then(() => {
-    connectWebSocket();
-    loadPatch();
+function applyDMXData(fixtures) {
+  fixtures.forEach(fixture => {
+    const element = document.getElementById(`fixture-${fixture.address}`);
+    console.log(`[Client] Processing fixture ID: fixture-${fixture.address}`);
+    if (!element) return;
+
+    fixture.channels.forEach(attr => {
+      console.log(`[Client] Applying ${attr.type} to element fixture-${fixture.address} with channels`, attr.channels);
+
+      if (attr.type === "RGB") {
+        const color = `rgb(${attr.channels[0]}, ${attr.channels[1]}, ${attr.channels[2]})`;
+        element.querySelector('div').style.backgroundColor = color;
+      } else if (attr.type === "Intensity") {
+        element.style.opacity = attr.channels[0] / 255;
+      } else if (attr.type === "Frost") {
+        element.querySelector('div').style.boxShadow = `0 0 20px 15px rgba(255,255,255,${attr.channels[0]/255})`;
+      }
+    });
   });
 }
 
-async function loadPatch() {
-  const res = await fetch('/patch/patch.json');
-  patch = await res.json();
-
-  const container = document.getElementById('fixture-container');
+function renderFixtures() {
+  const container = document.getElementById("fixture-container");
   container.innerHTML = '';
 
-  for (const fixture of patch) {
-    await loadFixture(fixture);
-  }
+  outputFixtures.forEach(async (fixture) => {
+    const res = await fetch(`/fixtures/${fixture.fixtureType}/template.html`);
+    const html = await res.text();
 
-  renderPatchTable();
+    const div = document.createElement('div');
+    div.innerHTML = html;
+    div.id = `fixture-${fixture.address}`;
+    div.setAttribute('data-address', fixture.address);
+    div.setAttribute('data-fixture-type', fixture.fixtureType);
+    container.appendChild(div);
+
+    // Load fixture CSS if not already loaded
+    if (!document.querySelector(`link[href="/fixtures/${fixture.fixtureType}/style.css"]`)) {
+      const link = document.createElement('link');
+      link.rel = 'stylesheet';
+      link.href = `/fixtures/${fixture.fixtureType}/style.css`;
+      document.head.appendChild(link);
+    }
+  });
 }
 
-async function loadFixture(fixture) {
-  const container = document.getElementById('fixture-container');
-
-  const templateUrl = `/fixtures/${fixture.fixtureType}/template.html`;
-  const configUrl = `/fixtures/${fixture.fixtureType}/config.json`;
-
-  const [templateRes, configRes] = await Promise.all([
-    fetch(templateUrl),
-    fetch(configUrl)
-  ]);
-
-  const html = await templateRes.text();
-  const config = await configRes.json();
-
-  const wrapper = document.createElement('div');
-  wrapper.id = fixture.id || `fixture-${fixture.address}`;
-  wrapper.dataset.address = fixture.address;
-  wrapper.dataset.fixtureType = fixture.fixtureType;
-  wrapper.innerHTML = html;
-
-  container.appendChild(wrapper);
-
-  const style = document.createElement('link');
-  style.rel = 'stylesheet';
-  style.href = `/fixtures/${fixture.fixtureType}/style.css`;
-  document.head.appendChild(style);
-
-  fixtureConfigs[wrapper.id] = config; // Fixed: load config for each fixture at startup
+function updatePatchTable() {
+  const tableBody = document.getElementById("patch-list-body");
+  tableBody.innerHTML = '';
+  outputFixtures.forEach(fixture => {
+    const row = document.createElement('tr');
+    row.innerHTML = `<td>${fixture.fixtureType}</td><td>${fixture.address}</td>`;
+    tableBody.appendChild(row);
+  });
 }
 
-function renderPatchTable() {
-  const tbody = document.getElementById('patch-list-body');
-  tbody.innerHTML = '';
-  patch.forEach(fx => {
-    const tr = document.createElement('tr');
-    tr.innerHTML = `<td>${fx.fixtureType}</td><td>${fx.address}</td>`;
-    tbody.appendChild(tr);
+function updateFixtureDropdown() {
+  const select = document.getElementById("fixture-type-select");
+  select.innerHTML = '';
+  fixtureTypes.forEach(type => {
+    const option = document.createElement('option');
+    option.value = type;
+    option.textContent = type;
+    select.appendChild(option);
   });
 }
 
 async function addFixture() {
-  const type = document.getElementById('fixture-type-select').value;
-  const address = parseInt(document.getElementById('fixture-address-input').value, 10);
-  if (!type || isNaN(address)) return;
+  const fixtureType = document.getElementById("fixture-type-select").value;
+  const address = parseInt(document.getElementById("fixture-address-input").value);
+  if (!fixtureType || !address) return;
 
-  patch.push({ fixtureType: type, address });
-
-  await fetch('/patch', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(patch)
-  });
-
-  await loadFixture({ fixtureType: type, address });
-  renderPatchTable();
+  outputFixtures.push({ fixtureType, address });
+  ws.send(JSON.stringify({ type: 'patch', patch: outputFixtures }));
+  renderFixtures();
+  updatePatchTable();
 }
 
-function savePatch() {
-  fetch('/save-patch', {
-    method: 'POST'
+async function savePatch() {
+  ws.send(JSON.stringify({ type: 'save-patch', patch: outputFixtures }));
+}
+
+function applySettings() {
+  const nic = document.getElementById("nic").value;
+  const universe = document.getElementById("universe").value;
+  ws.send(JSON.stringify({ type: 'settings', nic, universe }));
+  document.getElementById("sacn-status").textContent = 'Status: 🟢 Connected';
+}
+
+function setupEvents() {
+  document.getElementById("add-fixture-btn").addEventListener('click', addFixture);
+  document.getElementById("save-patch-btn").addEventListener('click', savePatch);
+  document.getElementById("settings-icon").addEventListener('click', () => {
+    document.getElementById("settings-modal").style.display = 'block';
+  });
+  document.getElementById("settings-modal").addEventListener('mouseleave', () => {
+    setTimeout(() => {
+      document.getElementById("settings-modal").style.display = 'none';
+    }, 5000);
   });
 }
 
-// Initialization
-fetch('/nics')
-  .then(res => res.json())
-  .then(nics => {
-    const nicSelect = document.getElementById('nic');
-    nics.forEach(nic => {
-      const opt = document.createElement('option');
-      opt.value = nic.address;
-      opt.textContent = `${nic.name} (${nic.address})`;
-      nicSelect.appendChild(opt);
-    });
-    return fetch('/fixtures');
-  })
-  .then(res => res.json())
-  .then(fixtures => {
-    const fixtureSelect = document.getElementById('fixture-type-select');
-    fixtures.forEach(name => {
-      const opt = document.createElement('option');
-      opt.value = name;
-      opt.textContent = name;
-      fixtureSelect.appendChild(opt);
-    });
-    return fetch('/config');
-  })
-  .then(res => res.json())
-  .then(config => {
-    if (config.nic) document.getElementById('nic').value = config.nic;
-    if (config.universe) document.getElementById('universe').value = config.universe;
-    loadPatch();
-  });
-
-document.getElementById('add-fixture-btn').addEventListener('click', addFixture);
-document.getElementById('save-patch-btn').addEventListener('click', savePatch);
-
-document.getElementById('settings-icon').addEventListener('click', () => {
-  const modal = document.getElementById('settings-modal');
-  modal.style.display = modal.style.display === 'block' ? 'none' : 'block';
-});
+window.onload = () => {
+  connectWebSocket();
+  setupEvents();
+};

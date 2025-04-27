@@ -1,151 +1,182 @@
-// server.js
+// Full corrected script.js based on latest repo and all recent findings
 
-const express = require('express');
-const path = require('path');
-const http = require('http');
-const WebSocket = require('ws');
-const dgram = require('dgram');
-const os = require('os');
-const fs = require('fs');
+let ws;
+let fixtureConfigs = {}; // Map of fixture IDs to their config
 
-const app = express();
-const server = http.createServer(app);
-const wss = new WebSocket.Server({ server });
-
-app.use(express.static('public'));
-app.use('/fixtures', express.static(path.join(__dirname, 'fixtures')));
-app.use(express.json());
-
-let patch = require('./patch/patch.json');
-let config = {
-  nic: '127.0.0.1',
-  universe: 1
-};
-let udpSocket;
-let lastDmxTimestamp = 0;
-
-// List NICs
-app.get('/nics', (req, res) => {
-  const interfaces = os.networkInterfaces();
-  const nics = [];
-  for (const name in interfaces) {
-    for (const nic of interfaces[name]) {
-      if (!nic.internal && nic.family === 'IPv4') {
-        nics.push({ name, address: nic.address });
-      }
-    }
-  }
-  nics.unshift({ name: 'TEST SIGNAL', address: '127.0.0.1' });
-  res.json(nics);
-});
-
-// Config endpoints
-app.get('/config', (req, res) => {
-  res.json(config);
-});
-
-app.post('/config', (req, res) => {
-  const { nic, universe } = req.body;
-  config.nic = nic;
-  config.universe = parseInt(universe, 10);
-
-  console.log('Updated config:', config);
-
-  if (udpSocket) {
-    udpSocket.close();
-    console.log('Closed previous UDP socket.');
-  }
-
-  setupReceiver();
-  res.json({ status: 'ok' });
-});
-
-// Fixture and patch endpoints
-app.get('/fixtures', (req, res) => {
-  const fixturesDir = path.join(__dirname, 'fixtures');
-  const fixtureTypes = fs.readdirSync(fixturesDir).filter(name => {
-    const fullPath = path.join(fixturesDir, name);
-    return fs.lstatSync(fullPath).isDirectory();
-  });
-  res.json(fixtureTypes);
-});
-
-app.get('/patch/patch.json', (req, res) => {
-  res.json(patch);
-});
-
-app.post('/patch', (req, res) => {
-  patch = req.body;
-  console.log('Patch updated:', patch);
-  res.json({ status: 'ok' });
-});
-
-app.post('/save-patch', (req, res) => {
-  fs.writeFileSync(path.join(__dirname, 'patch/patch.json'), JSON.stringify(patch, null, 2));
-  res.json({ status: 'ok' });
-});
-
-// UDP Receiver Setup
-function setupReceiver() {
-  udpSocket = dgram.createSocket('udp4');
-
-  udpSocket.on('listening', () => {
-    const address = udpSocket.address();
-    console.log(`UDP Socket listening on ${address.address}:${address.port}`);
-    try {
-      const multicastGroup = `239.255.0.${config.universe}`;
-      udpSocket.addMembership(multicastGroup, config.nic === '127.0.0.1' ? undefined : config.nic);
-      console.log(`Joined multicast group ${multicastGroup} on NIC ${config.nic}`);
-    } catch (err) {
-      console.error('UDP Socket error:', err);
-    }
-  });
-
-  udpSocket.on('message', (msg) => {
-    if (msg.length < 126) return; // sACN minimum packet size
-    const universe = msg.readUInt16BE(113);
-    if (universe !== config.universe) return;
-
-    const dmxData = msg.slice(126);
-    lastDmxTimestamp = Date.now();
-
-    const fixtureData = patch.map(fixture => {
-      const slice = dmxData.slice(fixture.address - 1, fixture.address - 1 + 40);
-      return {
-        id: fixture.id || `fixture-${fixture.address}`,
-        dmx: Array.from(slice)
-      };
-    });
-
-    const payload = JSON.stringify({ type: 'update', fixtures: fixtureData });
-
-    wss.clients.forEach(client => {
-      if (client.readyState === WebSocket.OPEN) {
-        client.send(payload);
-      }
-    });
-  });
-
-  udpSocket.bind(5568);
+// Utility to fetch JSON safely
+async function fetchJSON(url) {
+  const res = await fetch(url);
+  if (!res.ok) throw new Error(`Failed to fetch ${url}`);
+  return res.json();
 }
 
-wss.on('connection', (ws) => {
-  console.log('New WebSocket client connected.');
+// Utility to fetch text (for templates)
+async function fetchText(url) {
+  const res = await fetch(url);
+  if (!res.ok) throw new Error(`Failed to fetch ${url}`);
+  return res.text();
+}
 
-  const interval = setInterval(() => {
-    if (ws.readyState === WebSocket.OPEN) {
-      const now = Date.now();
-      if (now - lastDmxTimestamp < 3000) {
-        ws.send(JSON.stringify({ type: 'dmx_heartbeat', status: 'connected' }));
-      } else {
-        ws.send(JSON.stringify({ type: 'dmx_heartbeat', status: 'waiting' }));
-      }
-    } else {
-      clearInterval(interval);
+// Load a fixture by fixtureType and fixtureID
+async function loadFixture(fixtureType, fixtureID, address) {
+  const container = document.getElementById('fixture-container');
+
+  const wrapper = document.createElement('div');
+  wrapper.id = fixtureID;
+  wrapper.dataset.address = address;
+  wrapper.dataset.fixtureType = fixtureType;
+
+  // Load HTML
+  const html = await fetchText(`/fixtures/${fixtureType}/template.html`);
+  wrapper.innerHTML = html;
+
+  container.appendChild(wrapper);
+
+  // Load CSS
+  const cssId = `css-${fixtureType}`;
+  if (!document.getElementById(cssId)) {
+    const link = document.createElement('link');
+    link.id = cssId;
+    link.rel = 'stylesheet';
+    link.href = `/fixtures/${fixtureType}/style.css`;
+    document.head.appendChild(link);
+  }
+
+  // Load Config
+  const config = await fetchJSON(`/fixtures/${fixtureType}/config.json`);
+  fixtureConfigs[fixtureID] = config;
+}
+
+// Render initial patch
+async function loadPatch(fixtures) {
+  for (const { fixtureType, address } of fixtures) {
+    const fixtureID = `fixture-${address}`;
+    await loadFixture(fixtureType, fixtureID, address);
+  }
+}
+
+// Fill fixture type dropdown
+async function loadFixtureTypes() {
+  const res = await fetch('/fixtures');
+  const types = await res.json();
+
+  const select = document.getElementById('fixture-type-select');
+  select.innerHTML = '';
+
+  types.forEach(type => {
+    const option = document.createElement('option');
+    option.value = type;
+    option.textContent = type;
+    select.appendChild(option);
+  });
+}
+
+// Render patch list
+function renderPatchList(fixtures) {
+  const tbody = document.getElementById('patch-list-body');
+  tbody.innerHTML = '';
+
+  fixtures.forEach(({ fixtureType, address }) => {
+    const tr = document.createElement('tr');
+    tr.innerHTML = `<td>${fixtureType}</td><td>${address}</td>`;
+    tbody.appendChild(tr);
+  });
+}
+
+// Save patch to server
+async function savePatch(fixtures) {
+  await fetch('/save-patch', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(fixtures),
+  });
+}
+
+// Apply NIC/universe settings
+function applySettings() {
+  const nic = document.getElementById('nic').value;
+  const universe = parseInt(document.getElementById('universe').value);
+  ws.send(JSON.stringify({ type: 'settings', nic, universe }));
+}
+
+// Add fixture from UI
+async function addFixture() {
+  const fixtureType = document.getElementById('fixture-type-select').value;
+  const address = parseInt(document.getElementById('fixture-address-input').value);
+  if (!fixtureType || isNaN(address)) return;
+
+  const newFixture = { fixtureType, address };
+  outputFixtures.push(newFixture);
+
+  await loadFixture(fixtureType, `fixture-${address}`, address);
+  renderPatchList(outputFixtures);
+}
+
+// WebSocket init
+function initWebSocket() {
+  ws = new WebSocket(`ws://${location.host}`);
+
+  ws.onopen = () => {
+    console.log('[Client] WebSocket connected');
+  };
+
+  ws.onmessage = async (msg) => {
+    const data = JSON.parse(msg.data);
+
+    if (data.type === 'patch') {
+      outputFixtures = data.fixtures;
+      await loadPatch(outputFixtures);
+      renderPatchList(outputFixtures);
+      await loadFixtureTypes();
     }
-  }, 1000);
-});
 
-server.listen(3000, () => {
-  console.log('Server running on http://localhost:3000');
-});
+    if (data.type === 'update') {
+      console.log('[Client] Received update DMX frame:', data.frames);
+      applyDMX(data.frames);
+    }
+  };
+}
+
+// DMX Application
+function applyDMX(frames) {
+  frames.forEach(({ fixtureID, channels }) => {
+    console.log(`[Client] Processing fixture ID: ${fixtureID}`);
+
+    const el = document.getElementById(fixtureID);
+    const config = fixtureConfigs[fixtureID];
+
+    if (!el || !config) {
+      console.warn(`[Client] Missing element or config for ${fixtureID}`);
+      return;
+    }
+
+    for (const attr of config.attributes) {
+      const { type, element, channels: attrChannels } = attr;
+      const target = el.querySelector(`#${element}`);
+
+      console.log(`[Client] Applying ${type} to element ${element} with channels ${attrChannels}`);
+
+      if (!target) continue;
+
+      if (type === 'Intensity') {
+        const value = channels[attrChannels[0]] / 255;
+        target.style.opacity = value;
+      } else if (type === 'RGB') {
+        const [r, g, b] = attrChannels.map(c => channels[c]);
+        target.style.backgroundColor = `rgb(${r},${g},${b})`;
+      } else if (type === 'Frost') {
+        const frostValue = channels[attrChannels[0]] / 255;
+        target.style.boxShadow = `0 0 20px 15px rgba(255,255,255,${frostValue})`;
+      }
+    }
+  });
+}
+
+// Init
+window.onload = () => {
+  initWebSocket();
+
+  document.getElementById('apply-settings').onclick = applySettings;
+  document.getElementById('add-fixture-btn').onclick = addFixture;
+  document.getElementById('save-patch-btn').onclick = () => savePatch(outputFixtures);
+};
