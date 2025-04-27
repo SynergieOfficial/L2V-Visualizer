@@ -1,60 +1,65 @@
+// server.js
+
 const express = require('express');
-const app = express();
+const path = require('path');
 const http = require('http');
-const server = http.createServer(app);
 const WebSocket = require('ws');
-const wss = new WebSocket.Server({ server });
 const dgram = require('dgram');
 const os = require('os');
 const fs = require('fs');
-const path = require('path');
 
+const app = express();
+const server = http.createServer(app);
+const wss = new WebSocket.Server({ server });
+
+app.use(express.static('public'));
+app.use(express.json());
+
+let patch = require('./patch/patch.json');
 let config = {
   nic: '127.0.0.1',
   universe: 1
 };
-
 let udpSocket;
 
-const patchFilePath = path.join(__dirname, 'patch', 'patch.json');
-const patch = JSON.parse(fs.readFileSync(patchFilePath, 'utf-8'));
-
-// Load all fixture configs
-const fixtureConfigs = {};
-const fixturesFolder = path.join(__dirname, 'fixtures');
-for (const fixtureType of fs.readdirSync(fixturesFolder)) {
-  const configPath = path.join(fixturesFolder, fixtureType, 'config.json');
-  if (fs.existsSync(configPath)) {
-    fixtureConfigs[fixtureType] = JSON.parse(fs.readFileSync(configPath, 'utf-8'));
-  }
-}
-
-app.use(express.static('public'));
-app.use('/patch', express.static('patch'));
-app.use('/fixtures', express.static('fixtures'));
-app.use(express.json());
-
-// NIC listing
+// List NICs
 app.get('/nics', (req, res) => {
   const interfaces = os.networkInterfaces();
-  const nics = [{ name: 'TEST SIGNAL', address: '127.0.0.1' }];
-
-  for (const name of Object.keys(interfaces)) {
-    for (const iface of interfaces[name]) {
-      if (iface.family === 'IPv4' && !iface.internal) {
-        nics.push({
-          name: name,
-          address: iface.address
-        });
+  const nics = [];
+  for (const name in interfaces) {
+    for (const nic of interfaces[name]) {
+      if (!nic.internal && nic.family === 'IPv4') {
+        nics.push({ name, address: nic.address });
       }
     }
   }
-
+  nics.unshift({ name: 'TEST SIGNAL', address: '127.0.0.1' });
   res.json(nics);
 });
 
+// Config endpoints
+app.get('/config', (req, res) => {
+  res.json(config);
+});
+
+app.post('/config', (req, res) => {
+  const { nic, universe } = req.body;
+  config.nic = nic;
+  config.universe = parseInt(universe);
+
+  console.log('Updated config:', config);
+
+  if (udpSocket) {
+    udpSocket.close();
+    console.log('Closed previous UDP socket.');
+  }
+
+  setupReceiver();
+  res.json({ status: 'ok' });
+});
+
+// Fixture and patch endpoints
 app.get('/fixtures', (req, res) => {
-  const fs = require('fs');
   const fixturesDir = path.join(__dirname, 'fixtures');
   const fixtureTypes = fs.readdirSync(fixturesDir).filter(name => {
     const fullPath = path.join(fixturesDir, name);
@@ -63,126 +68,70 @@ app.get('/fixtures', (req, res) => {
   res.json(fixtureTypes);
 });
 
-// Config handling
-app.get('/config', (req, res) => {
-  res.json(config);
+app.get('/patch/patch.json', (req, res) => {
+  res.json(patch);
 });
 
-app.post('/config', (req, res) => {
-  config = req.body;
-  console.log('Updated config:', config);
-  setupReceiver();
-  res.sendStatus(200);
-});
-
-// WebSocket handling
-wss.on('connection', (ws) => {
-  console.log('New WebSocket client connected.');
-  ws.send(JSON.stringify({
-    type: 'patch',
-    data: patch
-  }));
-});
-
-// UDP Socket setup
-function setupReceiver() {
-  if (udpSocket) {
-    udpSocket.close();
-    console.log('Closed previous UDP socket.');
-  }
-
-  udpSocket = dgram.createSocket({ type: 'udp4', reuseAddr: true });
-
-  udpSocket.on('listening', () => {
-    const address = udpSocket.address();
-    console.log(`UDP Socket listening on ${address.address}:${address.port}`);
-  
-    const multicastAddress = universeToMulticastAddress(config.universe);
-  
-    try {
-      udpSocket.addMembership(multicastAddress, config.nic);
-      console.log(`Joined multicast group ${multicastAddress} on NIC ${config.nic}`);
-    } catch (err) {
-      console.error('Failed to join multicast group:', err);
-    }
-  });
-
-  udpSocket.on('message', (msg) => {
-    // Calculate DMX buffer
-    const dmxData = msg.slice(126); // Skip sACN headers, get DMX payload
-    if (!dmxData || dmxData.length === 0) return;
-  
-    // Prepare the fixture updates
-    const fixturesToSend = patch.map(fixture => {
-      const config = fixtureConfigs[fixture.fixtureType];
-      if (!config) return null;
-  
-      const start = fixture.address - 1; // DMX address is 1-indexed
-      const end = start + config.footprint;
-  
-      const fixtureDMX = [];
-      for (let i = start; i < end; i++) {
-        fixtureDMX.push(dmxData[i] || 0);
-      }
-  
-      return {
-        id: fixture.id || `fixture-${fixture.address}`,
-        fixtureType: fixture.fixtureType,
-        address: fixture.address,   // 🔥 Add address field here
-        dmx: fixtureDMX
-      };
-    }).filter(f => f !== null);
-  
-    // Broadcast to all WebSocket clients
-    wss.clients.forEach(client => {
-      if (client.readyState === WebSocket.OPEN) {
-        client.send(JSON.stringify({
-          type: 'update',
-          fixtures: fixturesToSend
-        }));
-      }
-    });
-  
-    // Also send heartbeat to frontend
-    wss.clients.forEach(client => {
-      if (client.readyState === WebSocket.OPEN) {
-        client.send(JSON.stringify({
-          type: 'dmx_heartbeat'
-        }));
-      }
-    });
-  });
-
-  udpSocket.on('error', (err) => {
-    console.error('UDP Socket error:', err);
-  });
-
-  udpSocket.bind(5568, '0.0.0.0');
-}
-
-// sACN Multicast Address for given universe
-function universeToMulticastAddress(universe) {
-  const high = ((universe >> 8) & 0xff);
-  const low = (universe & 0xff);
-  return `239.255.${high}.${low}`;
-}
-
-// Start server
-setupReceiver();
-
-app.post('/patch', express.json(), (req, res) => {
+app.post('/patch', (req, res) => {
   patch = req.body;
   console.log('Patch updated:', patch);
   res.json({ status: 'ok' });
 });
 
 app.post('/save-patch', (req, res) => {
-  const fs = require('fs');
   fs.writeFileSync(path.join(__dirname, 'patch/patch.json'), JSON.stringify(patch, null, 2));
   res.json({ status: 'ok' });
 });
 
-const PORT = process.env.PORT || 3000;
-server.listen(PORT, () => {
-  console.log(`Server running on http://localhost:${PORT}`);
+// UDP Receiver Setup
+function setupReceiver() {
+  udpSocket = dgram.createSocket('udp4');
+
+  udpSocket.on('listening', () => {
+    const address = udpSocket.address();
+    console.log(`UDP Socket listening on ${address.address}:${address.port}`);
+    try {
+      const multicastGroup = `239.255.0.${config.universe}`;
+      udpSocket.addMembership(multicastGroup, config.nic === '127.0.0.1' ? undefined : config.nic);
+      console.log(`Joined multicast group ${multicastGroup} on NIC ${config.nic}`);
+    } catch (err) {
+      console.error('UDP Socket error:', err);
+    }
+  });
+
+  udpSocket.on('message', (msg) => {
+    if (msg.length < 126) return; // sACN minimum packet size
+    const universe = msg.readUInt16BE(113);
+    if (universe !== config.universe) return;
+
+    const dmxData = msg.slice(126);
+
+    const fixtureData = patch.map(fixture => {
+      const slice = dmxData.slice(fixture.address - 1, fixture.address - 1 + 40);
+      return {
+        id: fixture.id || `fixture-${fixture.address}`,
+        dmx: Array.from(slice)
+      };
+    });
+
+    const payload = JSON.stringify({ type: 'update', fixtures: fixtureData });
+
+    wss.clients.forEach(client => {
+      if (client.readyState === WebSocket.OPEN) {
+        client.send(payload);
+      }
+    });
+  });
+
+  udpSocket.bind(5568);
+}
+
+setupReceiver();
+
+wss.on('connection', (ws) => {
+  console.log('New WebSocket client connected.');
+});
+
+server.listen(3000, () => {
+  console.log('Server running on http://localhost:3000');
 });
