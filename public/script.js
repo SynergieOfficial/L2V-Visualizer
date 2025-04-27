@@ -1,6 +1,9 @@
+// script.js
+
 let ws;
 let sacnTimeout;
-const fixtureConfigs = {}; // Cache loaded configs
+let localPatch = [];
+const fixtureConfigs = {};
 
 function connectWebSocket() {
   if (ws) ws.close();
@@ -14,11 +17,6 @@ function connectWebSocket() {
       handleDMXUpdate(data.fixtures);
     }
 
-    if (data.type === 'patch') {
-      console.log('Received patch:', data.data);
-      loadFixtures(data.data);
-    }
-
     if (data.type === 'dmx_heartbeat') {
       document.getElementById('sacn-status').innerHTML = 'Status: 🟢 Connected';
       clearTimeout(sacnTimeout);
@@ -27,6 +25,51 @@ function connectWebSocket() {
       }, 3000);
     }
   };
+}
+
+function handleDMXUpdate(fixtures) {
+  fixtures.forEach(fx => {
+    const wrapper = document.getElementById(fx.id || `fixture-${fx.address}`);
+    if (!wrapper) return;
+
+    const fixtureType = wrapper.dataset.fixtureType;
+    const config = fixtureConfigs[fixtureType];
+    if (!config) return;
+
+    config.attributes.forEach(attr => {
+      const value = fx.dmx[attr.channel - 1] || 0;
+      attr.elements.forEach(id => {
+        const el = document.getElementById(id);
+        if (!el) return;
+
+        if (attr.type === 'rgb') {
+          const r = fx.dmx[attr.channel - 1] || 0;
+          const g = fx.dmx[attr.channel] || 0;
+          const b = fx.dmx[attr.channel + 1] || 0;
+          el.style.backgroundColor = `rgb(${r}, ${g}, ${b})`;
+        }
+
+        if (attr.type === 'intensity') {
+          el.style.opacity = value / 255;
+        }
+
+        if (attr.type === 'intensity_rgb') {
+          const intensity = fx.dmx[attr.channel - 1] || 0;
+          const r = fx.dmx[attr.channel] || 0;
+          const g = fx.dmx[attr.channel + 1] || 0;
+          const b = fx.dmx[attr.channel + 2] || 0;
+          el.style.backgroundColor = `rgb(${r}, ${g}, ${b})`;
+          el.style.opacity = intensity / 255;
+        }
+
+        if (attr.type === 'frost') {
+          const opacity = value / 255 * 0.6;
+          const currentColor = window.getComputedStyle(el).backgroundColor;
+          el.style.boxShadow = `0px 0px 20px 15px ${currentColor.replace('rgb', 'rgba').replace(')', `,${opacity})`)}`;
+        }
+      });
+    });
+  });
 }
 
 function applySettings() {
@@ -41,120 +84,40 @@ function applySettings() {
   });
 }
 
+async function loadFixture(fixture) {
+  const container = document.getElementById('fixture-container');
+
+  const wrapper = document.createElement('div');
+  wrapper.id = fixture.id || `fixture-${fixture.address}`;
+  wrapper.dataset.address = fixture.address;
+  wrapper.dataset.fixtureType = fixture.fixtureType;
+
+  const templateUrl = `/fixtures/${fixture.fixtureType}/template.html`;
+  const response = await fetch(templateUrl);
+  const html = await response.text();
+  wrapper.innerHTML = html;
+
+  container.appendChild(wrapper);
+
+  const style = document.createElement('link');
+  style.rel = 'stylesheet';
+  style.href = `/fixtures/${fixture.fixtureType}/style.css`;
+  document.head.appendChild(style);
+
+  const configUrl = `/fixtures/${fixture.fixtureType}/config.json`;
+  const configRes = await fetch(configUrl);
+  const config = await configRes.json();
+  fixtureConfigs[fixture.fixtureType] = config;
+}
+
 async function loadFixtures(patch) {
   const container = document.getElementById('fixture-container');
   container.innerHTML = '';
-
   for (const fixture of patch) {
-    const wrapper = document.createElement('div');
-    wrapper.id = fixture.id || `fixture-${fixture.address}`; // 🔥 New safe ID assignment!
-    wrapper.dataset.address = fixture.address;
-    wrapper.dataset.fixtureType = fixture.fixtureType;
-
-    const templateUrl = `/fixtures/${fixture.fixtureType}/template.html`;
-    const response = await fetch(templateUrl);
-    const html = await response.text();
-    wrapper.innerHTML = html;
-    container.appendChild(wrapper);
-
-    const style = document.createElement('link');
-    style.rel = 'stylesheet';
-    style.href = `/fixtures/${fixture.fixtureType}/style.css`;
-    document.head.appendChild(style);
-
-    if (!fixtureConfigs[fixture.fixtureType]) {
-      const configUrl = `/fixtures/${fixture.fixtureType}/config.json`;
-      const configResponse = await fetch(configUrl);
-      const configData = await configResponse.json();
-      fixtureConfigs[fixture.fixtureType] = configData;
-    }
+    await loadFixture(fixture);
   }
 }
 
-function handleDMXUpdate(fixtures) {
-  fixtures.forEach(fx => {
-    console.log("Receiving DMX for fixture:", fx.fixtureType, "at address", fx.address, "DMX:", fx.dmx); // 🔥 Add this line
-    const wrapper = document.getElementById(fx.id || `fixture-${fx.address}`);
-    if (!wrapper) return;
-
-    const config = fixtureConfigs[fx.fixtureType];
-    if (!config || !config.attributes) return;
-
-    const dmx = fx.dmx;
-
-    config.attributes.forEach(attr => {
-      const type = attr.type;
-      const startCh = attr.channel - 1;
-      const elements = attr.elements;
-
-      elements.forEach(elementId => {
-        const el = document.getElementById(elementId);
-        if (!el) return;
-
-        switch (type) {
-          case 'intensity':
-            if (dmx[startCh] !== undefined) {
-              el.style.opacity = dmx[startCh] / 255;
-            }
-            break;
-          case 'rgb':
-            if (dmx[startCh] !== undefined && dmx[startCh+1] !== undefined && dmx[startCh+2] !== undefined) {
-              const color = `rgb(${dmx[startCh]}, ${dmx[startCh+1]}, ${dmx[startCh+2]})`;
-              el.style.backgroundColor = color;
-            }
-            break;
-          case 'frost':
-            if (dmx[startCh] !== undefined) {
-              const frostOpacity = dmx[startCh] / 255 * 0.6;
-              const currentColor = window.getComputedStyle(el).backgroundColor;
-              el.style.boxShadow = `0px 0px 20px 15px ${currentColor.replace('rgb', 'rgba').replace(')', `,${frostOpacity})`)}`;
-            }
-            break;
-        }
-      });
-    });
-  });
-}
-
-fetch('/nics')
-  .then(res => res.json())
-  .then(nics => {
-    const nicSelect = document.getElementById('nic');
-    nics.forEach(nic => {
-      const opt = document.createElement('option');
-      opt.value = nic.address;
-      opt.textContent = `${nic.name} (${nic.address})`;
-      nicSelect.appendChild(opt);
-    });
-    return fetch('/config');
-  })
-  .then(res => res.json())
-  .then(config => {
-    if (config.nic) document.getElementById('nic').value = config.nic;
-    if (config.universe) document.getElementById('universe').value = config.universe;
-    console.log('Waiting for Apply to connect to sACN.');
-  });
-
-  // Load Patch and Populate Patch List
-  fetch('/patch/patch.json')
-  .then(res => res.json())
-  .then(patch => {
-    const patchListBody = document.getElementById('patch-list-body');
-    patch.forEach(fixture => {
-      const row = document.createElement('tr');
-      const typeCell = document.createElement('td');
-      const addressCell = document.createElement('td');
-      typeCell.textContent = fixture.fixtureType;
-      addressCell.textContent = fixture.address;
-      row.appendChild(typeCell);
-      row.appendChild(addressCell);
-      patchListBody.appendChild(row);
-    });
-  });
-
-let localPatch = []; // Local patch array for dynamic adding
-
-// Fetch available fixture types
 function fetchFixtureTypes() {
   fetch('/fixtures')
     .then(res => res.json())
@@ -169,10 +132,9 @@ function fetchFixtureTypes() {
     });
 }
 
-// Update Patch List Table
 function updatePatchListTable() {
   const tbody = document.getElementById('patch-list-body');
-  tbody.innerHTML = ''; // Clear table
+  tbody.innerHTML = '';
   localPatch.forEach(fixture => {
     const row = document.createElement('tr');
     const typeCell = document.createElement('td');
@@ -185,7 +147,6 @@ function updatePatchListTable() {
   });
 }
 
-// Add Fixture to Local Patch
 function addFixtureToPatch() {
   const type = document.getElementById('fixture-type-select').value;
   const address = parseInt(document.getElementById('fixture-address-input').value, 10);
@@ -203,27 +164,40 @@ function addFixtureToPatch() {
 
   localPatch.push(fixture);
 
-  // Load and inject fixture into DOM
   loadFixture(fixture);
-
-  // Update Table
   updatePatchListTable();
 }
 
-// Setup Event Listener
 document.getElementById('add-fixture-btn').addEventListener('click', addFixtureToPatch);
 
-// Extend Existing Patch Load
+// Initial Setup
+fetch('/nics')
+  .then(res => res.json())
+  .then(nics => {
+    const nicSelect = document.getElementById('nic');
+    nics.forEach(nic => {
+      const opt = document.createElement('option');
+      opt.value = nic.address;
+      opt.textContent = `${nic.name} (${nic.address})`;
+      nicSelect.appendChild(opt);
+    });
+    return fetch('/config');
+  })
+  .then(res => res.json())
+  .then(config => {
+    if (config.nic) document.getElementById('nic').value = config.nic;
+    if (config.universe) document.getElementById('universe').value = config.universe;
+    connectWebSocket();
+  });
+
 fetch('/patch/patch.json')
   .then(res => res.json())
   .then(patch => {
     localPatch = patch;
+    loadFixtures(patch);
     updatePatchListTable();
-    // Also load fixtures already in patch
-    patch.forEach(loadFixture);
   });
 
-// Fetch fixtures on page load
 fetchFixtureTypes();
 
 const icon = document.getElementById('settings-icon');
