@@ -16,6 +16,18 @@
     <input type="number" id="universe" value="1" min="1">
     <button onclick="applySettings()">Apply</button>
     <div id="sacn-status">Status: 🔴 Waiting</div>
+    <h3>Current Patch</h3>
+      <table id="patch-list">
+        <thead>
+          <tr>
+            <th>Fixture Type</th>
+            <th>Start Address</th>
+          </tr>
+        </thead>
+        <tbody id="patch-list-body">
+            <!-- Fixture rows will be inserted here by JS -->
+        </tbody>
+      </table>
   </div>
   <div id="fixture-container"></div>
   <script src="script.js"></script>

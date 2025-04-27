@@ -135,6 +135,23 @@ fetch('/nics')
     console.log('Waiting for Apply to connect to sACN.');
   });
 
+  // Load Patch and Populate Patch List
+  fetch('/patch/patch.json')
+  .then(res => res.json())
+  .then(patch => {
+    const patchListBody = document.getElementById('patch-list-body');
+    patch.forEach(fixture => {
+      const row = document.createElement('tr');
+      const typeCell = document.createElement('td');
+      const addressCell = document.createElement('td');
+      typeCell.textContent = fixture.fixtureType;
+      addressCell.textContent = fixture.address;
+      row.appendChild(typeCell);
+      row.appendChild(addressCell);
+      patchListBody.appendChild(row);
+    });
+  });
+
 const icon = document.getElementById('settings-icon');
 const modal = document.getElementById('settings-modal');
 let hideTimer;
