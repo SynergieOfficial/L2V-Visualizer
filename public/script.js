@@ -87,7 +87,7 @@ function handleDMXUpdate(fixtures) {
       const elements = attr.elements;
 
       elements.forEach(elementId => {
-        const el = wrapper.querySelector(`#${elementId}`);
+        const el = document.getElementById(elementId); // 🔥 Corrected here: Global ID lookup
         if (!el) return;
 
         switch (type) {
@@ -96,14 +96,12 @@ function handleDMXUpdate(fixtures) {
               el.style.opacity = dmx[startCh] / 255;
             }
             break;
-
           case 'rgb':
             if (dmx[startCh] !== undefined && dmx[startCh+1] !== undefined && dmx[startCh+2] !== undefined) {
               const color = `rgb(${dmx[startCh]}, ${dmx[startCh+1]}, ${dmx[startCh+2]})`;
               el.style.backgroundColor = color;
             }
             break;
-
           case 'frost':
             if (dmx[startCh] !== undefined) {
               const frostOpacity = dmx[startCh] / 255 * 0.6;
