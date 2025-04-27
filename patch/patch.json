@@ -11,5 +11,9 @@
     "fixtureType": "TestSquare",
     "address": 201,
     "id": "fixture-201"
+  },
+  {
+    "fixtureType": "TestSquare",
+    "address": 301
   }
 ]
