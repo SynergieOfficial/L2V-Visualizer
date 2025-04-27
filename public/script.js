@@ -76,7 +76,7 @@ function populateNICDropdown(nics) {
 }
 
 function loadPatch() {
-  fetch('/patch.json')
+  fetch('/Patch/patch.json')
     .then(res => res.json())
     .then(data => {
       patch = data;
