@@ -74,11 +74,8 @@ function fetchFixtureTypes() {
 }
 
 function loadPatch() {
-  fetch('/patch/patch.json')        // lowercase “patch”
-    .then(res => {
-      if (!res.ok) throw new Error('Patch not found');
-      return res.json();
-    })
+  fetch('/patch/patch.json')
+    .then(res => res.json())
     .then(data => {
       patch = data;
       renderPatchTable();
@@ -148,20 +145,18 @@ function processDMXUpdate(fixtures) {
     const wrapper = document.getElementById(id);
     if (!wrapper) return;
 
-    // zero-based start index for this fixture
+    // zero-based DMX start index for this fixture
     const base = parseInt(wrapper.dataset.address, 10) - 1;
 
-    // parse config JSON
     let config = wrapper.dataset.config;
     if (typeof config === 'string') {
       config = JSON.parse(config);
     }
 
-    // for each attribute, apply to the right DMX offset
     config.attributes.forEach(attr => {
+      // absolute DMX index in the universe
+      const idx = base + (attr.channel - 1);
       const type = attr.type.toLowerCase();
-      // absolute index in the universe
-      const idx  = base + (attr.channel - 1);
 
       attr.elements.forEach(elemId => {
         const el = wrapper.querySelector(`#${elemId}`);
@@ -194,7 +189,10 @@ function applyIntensity(el, value) {
 }
 
 function applyFrost(el, value) {
-  if (value === undefined) return;
+  if (value === undefined || value <= 0) {
+    el.style.filter = '';
+    return;
+  }
   el.style.filter = `blur(${value / 25}px)`;
 }
 
