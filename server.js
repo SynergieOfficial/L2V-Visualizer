@@ -30,6 +30,7 @@ for (const fixtureType of fs.readdirSync(fixturesFolder)) {
 }
 
 app.use(express.static('public'));
+app.use('/patch', express.static('patch'));
 app.use('/fixtures', express.static('fixtures'));
 app.use(express.json());
 
