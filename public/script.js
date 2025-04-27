@@ -1,6 +1,6 @@
 let ws;
 let sacnTimeout;
-const fixtureConfigs = {}; // cache loaded configs
+const fixtureConfigs = {}; // Cache loaded configs
 
 function connectWebSocket() {
   if (ws) ws.close();
@@ -41,11 +41,11 @@ function applySettings() {
   });
 }
 
-function loadFixtures(patch) {
+async function loadFixtures(patch) {
   const container = document.getElementById('fixture-container');
   container.innerHTML = '';
 
-  patch.forEach(async fixture => {
+  for (const fixture of patch) {
     const wrapper = document.createElement('div');
     wrapper.id = fixture.id;
     wrapper.dataset.address = fixture.address;
@@ -54,7 +54,6 @@ function loadFixtures(patch) {
     const templateUrl = `/fixtures/${fixture.fixtureType}/template.html`;
     const response = await fetch(templateUrl);
     const html = await response.text();
-
     wrapper.innerHTML = html;
     container.appendChild(wrapper);
 
@@ -63,14 +62,13 @@ function loadFixtures(patch) {
     style.href = `/fixtures/${fixture.fixtureType}/style.css`;
     document.head.appendChild(style);
 
-    // Preload fixture config
     if (!fixtureConfigs[fixture.fixtureType]) {
       const configUrl = `/fixtures/${fixture.fixtureType}/config.json`;
       const configResponse = await fetch(configUrl);
       const configData = await configResponse.json();
       fixtureConfigs[fixture.fixtureType] = configData;
     }
-  });
+  }
 }
 
 function handleDMXUpdate(fixtures) {
@@ -79,53 +77,43 @@ function handleDMXUpdate(fixtures) {
     if (!wrapper) return;
 
     const config = fixtureConfigs[fx.fixtureType];
-    if (!config) return; // No config loaded yet
+    if (!config || !config.attributes) return;
 
     const dmx = fx.dmx;
 
-    // Intensity
-    if (config.channels?.intensity) {
-      const intensityChannel = config.channels.intensity - 1;
-      const main = wrapper.querySelector('[data-element="main"]');
-      if (main && dmx.length > intensityChannel) {
-        main.style.opacity = dmx[intensityChannel] / 255;
-      }
-    }
+    config.attributes.forEach(attr => {
+      const type = attr.type;
+      const startCh = attr.channel - 1; // DMX is 1-indexed
+      const elements = attr.elements;
 
-    // Frost (adds glow)
-    if (config.channels?.frost) {
-      const frostChannel = config.channels.frost - 1;
-      const frostOpacity = dmx[frostChannel] / 255 * 0.6;
+      elements.forEach(elementId => {
+        const el = wrapper.querySelector(`#${elementId}`);
+        if (!el) return;
 
-      const glowTargets = wrapper.querySelectorAll('[data-element="frost-target"]');
-      glowTargets.forEach(target => {
-        const currentColor = window.getComputedStyle(target).backgroundColor;
-        target.style.boxShadow = `0px 0px 20px 15px ${currentColor.replace('rgb', 'rgba').replace(')', `,${frostOpacity})`)}`;
-      });
-    }
+        switch (type) {
+          case 'intensity':
+            if (dmx[startCh] !== undefined) {
+              el.style.opacity = dmx[startCh] / 255;
+            }
+            break;
 
-    // RGB attributes
-    for (const key of Object.keys(config.channels)) {
-      if (key.includes('rgb')) {
-        const [rCh, gCh, bCh] = config.channels[key].map(c => c - 1);
-        const element = wrapper.querySelector(`[data-element="${key}"]`);
-        if (element && dmx.length > bCh) {
-          const color = `rgb(${dmx[rCh]}, ${dmx[gCh]}, ${dmx[bCh]})`;
-          element.style.backgroundColor = color;
-        }
-      }
-    }
+          case 'rgb':
+            if (dmx[startCh] !== undefined && dmx[startCh+1] !== undefined && dmx[startCh+2] !== undefined) {
+              const color = `rgb(${dmx[startCh]}, ${dmx[startCh+1]}, ${dmx[startCh+2]})`;
+              el.style.backgroundColor = color;
+            }
+            break;
 
-    // Beam Intensities
-    if (config.channels?.beam_intensities) {
-      config.channels.beam_intensities.forEach((channel, index) => {
-        const beam = wrapper.querySelector(`[data-element="beam-${index + 1}"]`);
-        if (beam && dmx.length >= channel) {
-          const intensity = dmx[channel - 1];
-          beam.style.opacity = intensity / 255;
+          case 'frost':
+            if (dmx[startCh] !== undefined) {
+              const frostOpacity = dmx[startCh] / 255 * 0.6;
+              const currentColor = window.getComputedStyle(el).backgroundColor;
+              el.style.boxShadow = `0px 0px 20px 15px ${currentColor.replace('rgb', 'rgba').replace(')', `,${frostOpacity})`)}`;
+            }
+            break;
         }
       });
-    }
+    });
   });
 }
 

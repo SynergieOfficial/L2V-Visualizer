@@ -1,8 +1,15 @@
 {
-  "channels": 8,
-  "attributes": {
-    "rgb": {
-      "offset": 0
+  "footprint": 8,
+  "attributes": [
+    {
+      "type": "rgb",
+      "channel": 1,
+      "elements": ["TestSquare"]
+    },
+    {
+      "type": "frost",
+      "channel": 4,
+      "elements": ["TestSquare"]
     }
-  }
+  ]
 }

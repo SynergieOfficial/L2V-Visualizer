@@ -1,6 +1,7 @@
 .test-square {
-    width: 100px;
-    height: 100px;
-    background-color: black;
-    margin: 10px;
-  }
+  width: 100px;
+  height: 100px;
+  background: grey;
+  margin: 10px;
+  border-radius: 8px;
+}
