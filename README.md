@@ -155,6 +155,7 @@ Open `http://localhost:3000` in your web browser.
 ## Known Issues
 - Fixtures render but attributes do not update from DMX frames (working on it!).
 - Settings menu may need some small CSS/JS improvements for better UX.
+- Bug in current version, NIC selection dropdown is empty
 
 ---
 
