@@ -1,10 +1,15 @@
 [
-    {
-      "fixtureType": "TestSquare",
-      "address": 1
-    },
-    {
-      "fixtureType": "BOLT1C",
-      "address": 41
-    }
-  ]
+  {
+    "fixtureType": "TestSquare",
+    "address": 1
+  },
+  {
+    "fixtureType": "BOLT1C",
+    "address": 41
+  },
+  {
+    "fixtureType": "TestSquare",
+    "address": 201,
+    "id": "fixture-201"
+  }
+]

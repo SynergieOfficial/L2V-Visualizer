@@ -23,6 +23,7 @@ let config = {
   universe: 1
 };
 let udpSocket;
+let lastDmxTimestamp = Date.now();
 
 // List NICs
 app.get('/nics', (req, res) => {
@@ -47,7 +48,7 @@ app.get('/config', (req, res) => {
 app.post('/config', (req, res) => {
   const { nic, universe } = req.body;
   config.nic = nic;
-  config.universe = parseInt(universe);
+  config.universe = parseInt(universe, 10);
 
   console.log('Updated config:', config);
 
@@ -56,7 +57,7 @@ app.post('/config', (req, res) => {
     console.log('Closed previous UDP socket.');
   }
 
-  setupReceiver();
+  setupReceiver(); // Start fresh with new NIC and Universe after Apply
   res.json({ status: 'ok' });
 });
 
@@ -107,6 +108,7 @@ function setupReceiver() {
     if (universe !== config.universe) return;
 
     const dmxData = msg.slice(126);
+    lastDmxTimestamp = Date.now();
 
     const fixtureData = patch.map(fixture => {
       const slice = dmxData.slice(fixture.address - 1, fixture.address - 1 + 40);
@@ -128,10 +130,21 @@ function setupReceiver() {
   udpSocket.bind(5568);
 }
 
-setupReceiver();
-
 wss.on('connection', (ws) => {
   console.log('New WebSocket client connected.');
+
+  const interval = setInterval(() => {
+    if (ws.readyState === WebSocket.OPEN) {
+      const now = Date.now();
+      if (now - lastDmxTimestamp < 3000) {
+        ws.send(JSON.stringify({ type: 'dmx_heartbeat', status: 'connected' }));
+      } else {
+        ws.send(JSON.stringify({ type: 'dmx_heartbeat', status: 'waiting' }));
+      }
+    } else {
+      clearInterval(interval);
+    }
+  }, 1000);
 });
 
 server.listen(3000, () => {
