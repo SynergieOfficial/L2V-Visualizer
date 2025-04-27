@@ -15,15 +15,24 @@ function connectWebSocket() {
     const data = JSON.parse(event.data);
 
     if (data.type === 'update') {
+      console.log("[Client] Received update DMX frame:", data.fixtures);
       for (const fx of data.fixtures) {
+        console.log(`[Client] Processing fixture ID: ${fx.id}`);
         const wrapper = document.getElementById(fx.id);
-        if (!wrapper) continue;
+        if (!wrapper) {
+          console.warn(`[Client] Wrapper not found for fixture ${fx.id}`);
+          continue;
+        }
 
         const config = fixtureConfigs[fx.id];
-        if (!config) continue;
+        if (!config) {
+          console.warn(`[Client] No config found for fixture ${fx.id}`);
+          continue;
+        }
 
         for (const attribute of config.attributes) {
           const el = wrapper.querySelector(`#${attribute.element}`);
+          console.log(`[Client] Applying ${attribute.type} to element ${attribute.element} with channels ${attribute.channels}`);
           if (!el) continue;
 
           const ch = attribute.channels;
