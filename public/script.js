@@ -47,7 +47,7 @@ async function loadFixtures(patch) {
 
   for (const fixture of patch) {
     const wrapper = document.createElement('div');
-    wrapper.id = fixture.id;
+    wrapper.id = fixture.id || `fixture-${fixture.address}`; // 🔥 New safe ID assignment!
     wrapper.dataset.address = fixture.address;
     wrapper.dataset.fixtureType = fixture.fixtureType;
 
@@ -73,21 +73,21 @@ async function loadFixtures(patch) {
 
 function handleDMXUpdate(fixtures) {
   fixtures.forEach(fx => {
-    const wrapper = document.getElementById(fx.id);
+    const wrapper = document.getElementById(fx.id || `fixture-${fx.address}`);
     if (!wrapper) return;
 
     const config = fixtureConfigs[fx.fixtureType];
     if (!config || !config.attributes) return;
 
     const dmx = fx.dmx;
-    console.log("Handling fixture:", fx);
+
     config.attributes.forEach(attr => {
       const type = attr.type;
-      const startCh = attr.channel - 1; // DMX is 1-indexed
+      const startCh = attr.channel - 1;
       const elements = attr.elements;
 
       elements.forEach(elementId => {
-        const el = document.getElementById(elementId); // 🔥 Corrected here: Global ID lookup
+        const el = document.getElementById(elementId);
         if (!el) return;
 
         switch (type) {
@@ -113,7 +113,6 @@ function handleDMXUpdate(fixtures) {
       });
     });
   });
-  
 }
 
 fetch('/nics')
