@@ -73,6 +73,7 @@ async function loadFixtures(patch) {
 
 function handleDMXUpdate(fixtures) {
   fixtures.forEach(fx => {
+    console.log("Receiving DMX for fixture:", fx.fixtureType, "at address", fx.address, "DMX:", fx.dmx); // 🔥 Add this line
     const wrapper = document.getElementById(fx.id || `fixture-${fx.address}`);
     if (!wrapper) return;
 
