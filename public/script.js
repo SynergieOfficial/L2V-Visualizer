@@ -74,8 +74,11 @@ function fetchFixtureTypes() {
 }
 
 function loadPatch() {
-  fetch('/patch/patch.json')
-    .then(res => res.json())
+  fetch('/patch/patch.json')        // lowercase “patch”
+    .then(res => {
+      if (!res.ok) throw new Error('Patch not found');
+      return res.json();
+    })
     .then(data => {
       patch = data;
       renderPatchTable();
@@ -145,29 +148,33 @@ function processDMXUpdate(fixtures) {
     const wrapper = document.getElementById(id);
     if (!wrapper) return;
 
-    // parse the per-fixture config
+    // zero-based start index for this fixture
+    const base = parseInt(wrapper.dataset.address, 10) - 1;
+
+    // parse config JSON
     let config = wrapper.dataset.config;
     if (typeof config === 'string') {
       config = JSON.parse(config);
     }
 
-    // for each attribute in the config, apply it to each named element
+    // for each attribute, apply to the right DMX offset
     config.attributes.forEach(attr => {
-      const start = attr.channel - 1;
-      const type  = attr.type.toLowerCase();
+      const type = attr.type.toLowerCase();
+      // absolute index in the universe
+      const idx  = base + (attr.channel - 1);
 
       attr.elements.forEach(elemId => {
         const el = wrapper.querySelector(`#${elemId}`);
         if (!el) return;
 
         if (type === 'rgb') {
-          applyRGB(el, dmx.slice(start, start + 3));
+          applyRGB(el, dmx.slice(idx, idx + 3));
         }
         else if (type === 'intensity') {
-          applyIntensity(el, dmx[start]);
+          applyIntensity(el, dmx[idx]);
         }
         else if (type === 'frost') {
-          applyFrost(el, dmx[start]);
+          applyFrost(el, dmx[idx]);
         }
       });
     });
