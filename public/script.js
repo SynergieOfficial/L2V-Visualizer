@@ -184,8 +184,10 @@ function processDMXUpdate(fixtures) {
 function applyRGB(el, channels) {
   if (!channels) return;
   const [r, g, b] = channels;
+  // set the fill color…
   el.style.backgroundColor = `rgb(${r}, ${g}, ${b})`;
-  el.style.boxShadow = `rgba(${r}, ${g}, ${b}, 0.5) 0px 0px 20px 15px`;
+  // …but remove any Box-Shadow glow (frost is handled separately)
+  el.style.boxShadow = '';
 }
 
 function applyIntensity(el, value) {
