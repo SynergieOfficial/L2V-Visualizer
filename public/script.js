@@ -1,27 +1,33 @@
-// Corrected script.js according to repo state and current requirements
-
 let ws;
 let patch = [];
 let fixtureTypes = [];
 let sacnConnected = false;
 
 window.onload = () => {
+  setupSettingsMenu();
   fetchFixtureTypes();
   loadPatch();
-
-  document.getElementById('settings-icon').addEventListener('mouseenter', () => {
-    document.getElementById('settings-icon').classList.remove('hidden');
-  });
-
-  document.getElementById('settings-icon').addEventListener('mouseleave', () => {
-    setTimeout(() => {
-      document.getElementById('settings-icon').classList.add('hidden');
-    }, 5000);
-  });
 
   document.getElementById('add-fixture-btn').addEventListener('click', addFixture);
   document.getElementById('save-patch-btn').addEventListener('click', savePatchToDisk);
 };
+
+function setupSettingsMenu() {
+  const settingsIcon = document.getElementById('settings-icon');
+  const settingsModal = document.getElementById('settings-modal');
+
+  settingsIcon.addEventListener('click', () => {
+    settingsModal.style.display = (settingsModal.style.display === 'block') ? 'none' : 'block';
+  });
+
+  setTimeout(() => {
+    settingsIcon.classList.add('hidden');
+  }, 5000);
+
+  settingsIcon.addEventListener('mouseenter', () => {
+    settingsIcon.classList.remove('hidden');
+  });
+}
 
 function applySettings() {
   const nic = document.getElementById('nic').value;
@@ -42,8 +48,6 @@ function applySettings() {
       updateStatus(data.connected);
     } else if (data.type === 'update') {
       processDMXUpdate(data.fixtures);
-    } else if (data.type === 'nics') {
-      populateNICDropdown(data.nics);
     }
   };
 }
@@ -64,17 +68,6 @@ function fetchFixtureTypes() {
     });
 }
 
-function populateNICDropdown(nics) {
-  const nicSelect = document.getElementById('nic');
-  nicSelect.innerHTML = '';
-  nics.forEach(nic => {
-    const option = document.createElement('option');
-    option.value = nic;
-    option.textContent = nic;
-    nicSelect.appendChild(option);
-  });
-}
-
 function loadPatch() {
   fetch('/Patch/patch.json')
     .then(res => res.json())
@@ -85,9 +78,7 @@ function loadPatch() {
         loadFixture(fixtureType, address);
       });
     })
-    .catch(err => {
-      console.error('[Client] Failed to load patch.json:', err);
-    });
+    .catch(err => console.error('[Client] Failed to load patch.json:', err));
 }
 
 function addFixture() {
@@ -141,40 +132,45 @@ function loadFixture(type, address) {
     const style = document.createElement('style');
     style.innerHTML = css;
     document.head.appendChild(style);
-  }).catch(err => console.error('[Client] Failed to load fixture:', err));
+  }).catch(err => console.error(`[Client] Failed loading fixture ${type}:`, err));
 }
 
 function processDMXUpdate(fixtures) {
   fixtures.forEach(({ id, dmx }) => {
-    const wrapper = document.getElementById(id);
-    if (!wrapper) return;
-    const config = JSON.parse(wrapper.dataset.config || '{}');
+    const el = document.getElementById(id);
+    if (!el) return;
 
-    config.attributes?.forEach(attr => {
+    let config = el.dataset.config;
+    if (typeof config === 'string') {
+      config = JSON.parse(config);
+    }
+
+    config?.attributes?.forEach(attr => {
+      const start = attr.startChannel - 1;
       if (attr.type === 'RGB') {
-        applyRGB(wrapper.querySelector(`#${attr.elementId}`), dmx.slice(attr.startChannel - 1, attr.startChannel + 2));
+        applyRGB(el, dmx.slice(start, start + 3));
       } else if (attr.type === 'Intensity') {
-        applyIntensity(wrapper.querySelector(`#${attr.elementId}`), dmx[attr.startChannel - 1]);
+        applyIntensity(el, dmx[start]);
       } else if (attr.type === 'Frost') {
-        applyFrost(wrapper.querySelector(`#${attr.elementId}`), dmx[attr.startChannel - 1]);
+        applyFrost(el, dmx[start]);
       }
     });
   });
 }
 
 function applyRGB(el, channels) {
-  if (!el || !channels) return;
+  if (!channels) return;
   const [r, g, b] = channels;
   el.style.backgroundColor = `rgb(${r}, ${g}, ${b})`;
   el.style.boxShadow = `rgba(${r}, ${g}, ${b}, 0.5) 0px 0px 20px 15px`;
 }
 
 function applyIntensity(el, value) {
-  if (!el || value === undefined) return;
+  if (value === undefined) return;
   el.style.opacity = value / 255;
 }
 
 function applyFrost(el, value) {
-  if (!el || value === undefined) return;
+  if (value === undefined) return;
   el.style.filter = `blur(${value / 25}px)`;
 }
