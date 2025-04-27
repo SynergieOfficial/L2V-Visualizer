@@ -1,5 +1,3 @@
-// script.js
-
 let ws;
 let sacnTimeout;
 let localPatch = [];
@@ -12,11 +10,9 @@ function connectWebSocket() {
   ws.onopen = () => console.log('WebSocket connected');
   ws.onmessage = (event) => {
     const data = JSON.parse(event.data);
-
     if (data.type === 'update') {
       handleDMXUpdate(data.fixtures);
     }
-
     if (data.type === 'dmx_heartbeat') {
       document.getElementById('sacn-status').innerHTML = 'Status: 🟢 Connected';
       clearTimeout(sacnTimeout);
@@ -31,7 +27,6 @@ function handleDMXUpdate(fixtures) {
   fixtures.forEach(fx => {
     const wrapper = document.getElementById(fx.id || `fixture-${fx.address}`);
     if (!wrapper) return;
-
     const fixtureType = wrapper.dataset.fixtureType;
     const config = fixtureConfigs[fixtureType];
     if (!config) return;
@@ -48,11 +43,9 @@ function handleDMXUpdate(fixtures) {
           const b = fx.dmx[attr.channel + 1] || 0;
           el.style.backgroundColor = `rgb(${r}, ${g}, ${b})`;
         }
-
         if (attr.type === 'intensity') {
           el.style.opacity = value / 255;
         }
-
         if (attr.type === 'intensity_rgb') {
           const intensity = fx.dmx[attr.channel - 1] || 0;
           const r = fx.dmx[attr.channel] || 0;
@@ -61,7 +54,6 @@ function handleDMXUpdate(fixtures) {
           el.style.backgroundColor = `rgb(${r}, ${g}, ${b})`;
           el.style.opacity = intensity / 255;
         }
-
         if (attr.type === 'frost') {
           const opacity = value / 255 * 0.6;
           const currentColor = window.getComputedStyle(el).backgroundColor;
@@ -72,21 +64,8 @@ function handleDMXUpdate(fixtures) {
   });
 }
 
-function applySettings() {
-  const nic = document.getElementById('nic').value;
-  const universe = document.getElementById('universe').value;
-  fetch('/config', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ nic, universe })
-  }).then(() => {
-    connectWebSocket();
-  });
-}
-
 async function loadFixture(fixture) {
   const container = document.getElementById('fixture-container');
-
   const wrapper = document.createElement('div');
   wrapper.id = fixture.id || `fixture-${fixture.address}`;
   wrapper.dataset.address = fixture.address;
@@ -96,7 +75,6 @@ async function loadFixture(fixture) {
   const response = await fetch(templateUrl);
   const html = await response.text();
   wrapper.innerHTML = html;
-
   container.appendChild(wrapper);
 
   const style = document.createElement('link');
@@ -163,20 +141,30 @@ function addFixtureToPatch() {
   };
 
   localPatch.push(fixture);
+  loadFixture(fixture);
+  updatePatchListTable();
+  syncPatch();
+}
 
+function syncPatch() {
   fetch('/patch', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(localPatch)
   });
-
-  loadFixture(fixture);
-  updatePatchListTable();
 }
 
 document.getElementById('add-fixture-btn').addEventListener('click', addFixtureToPatch);
+document.getElementById('save-patch-btn').addEventListener('click', () => {
+  fetch('/save-patch', { method: 'POST' })
+    .then(res => res.json())
+    .then(data => {
+      if (data.status === 'ok') {
+        alert('Patch saved successfully!');
+      }
+    });
+});
 
-// Initial Setup
 fetch('/nics')
   .then(res => res.json())
   .then(nics => {
