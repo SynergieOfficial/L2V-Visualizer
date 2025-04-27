@@ -23,6 +23,18 @@ function connectWebSocket() {
   };
 }
 
+function applySettings() {
+  const nic = document.getElementById('nic').value;
+  const universe = document.getElementById('universe').value;
+  fetch('/config', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ nic, universe })
+  }).then(() => {
+    connectWebSocket();
+  });
+}
+
 function handleDMXUpdate(fixtures) {
   fixtures.forEach(fx => {
     const wrapper = document.getElementById(fx.id || `fixture-${fx.address}`);
