@@ -28,6 +28,19 @@ app.use(express.static('public'));
 app.use('/fixtures', express.static(path.join(__dirname, 'fixtures')));
 app.use(express.static(__dirname));
 
+app.get('/nics', (req, res) => {
+  const interfaces = os.networkInterfaces();
+  const nics = [{ name: 'TEST SIGNAL', address: '127.0.0.1' }];
+  for (const [name, list] of Object.entries(interfaces)) {
+    list.forEach(iface => {
+      if (iface.family === 'IPv4' && !iface.internal) {
+        nics.push({ name, address: iface.address });
+      }
+    });
+  }
+  res.json(nics);
+});
+
 // API to get available NICs
 app.get('/nics', (req, res) => {
   const interfaces = os.networkInterfaces();

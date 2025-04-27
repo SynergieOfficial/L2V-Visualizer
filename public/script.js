@@ -7,6 +7,11 @@ window.onload = () => {
   setupSettingsMenu();
   fetchFixtureTypes();
   loadPatch();
+  fetchNICs();   // ← populate the NIC dropdown
+  document.getElementById('add-fixture-btn')
+          .addEventListener('click', addFixture);
+  document.getElementById('save-patch-btn')
+          .addEventListener('click', savePatchToDisk);
 
   document.getElementById('add-fixture-btn').addEventListener('click', addFixture);
   document.getElementById('save-patch-btn').addEventListener('click', savePatchToDisk);
@@ -173,4 +178,20 @@ function applyIntensity(el, value) {
 function applyFrost(el, value) {
   if (value === undefined) return;
   el.style.filter = `blur(${value / 25}px)`;
+}
+
+function fetchNICs() {
+  fetch('/nics')
+    .then(res => res.json())
+    .then(nics => {
+      const nicSelect = document.getElementById('nic');
+      nicSelect.innerHTML = '';
+      nics.forEach(n => {
+        const opt = document.createElement('option');
+        opt.value = n.address;
+        opt.text  = `${n.name} (${n.address})`;
+        nicSelect.appendChild(opt);
+      });
+    })
+    .catch(err => console.error('[Client] Failed to fetch NICs:', err));
 }
