@@ -12,13 +12,15 @@ const wss    = new WebSocket.Server({ server });
 
 const PORT      = 3000;
 const SACN_PORT = 5568;
+// point at patch/patch.json instead of root
+const patchFile = path.join(__dirname, 'patch', 'patch.json');
 
 let outputFixtures = [];
 let universe       = 1;
 let nic            = '127.0.0.1';
 let udpSocket;
 
-/** Serve static files */
+/** Static file serving */
 app.use(express.static('public'));
 app.use('/fixtures', express.static(path.join(__dirname, 'fixtures')));
 app.use(express.static(__dirname));
@@ -49,49 +51,71 @@ app.get('/fixtures', (req, res) => {
   });
 });
 
-/** WebSocket handshake & commands */
+/** WebSocket: connect & save */
 wss.on('connection', ws => {
   ws.on('message', raw => {
     const msg = JSON.parse(raw);
+
     if (msg.type === 'connect') {
       nic = msg.nic;
       universe = parseInt(msg.universe, 10);
+      console.log(`[sACN] Client connected → NIC=${nic}, universe=${universe}`);
+      loadPatch();          // now reads patch/patch.json
       setupReceiver();
       ws.send(JSON.stringify({ type: 'status', connected: true }));
+
     } else if (msg.type === 'save') {
-      fs.writeFileSync('patch.json', JSON.stringify(msg.patch, null, 2));
+      fs.writeFileSync(patchFile, JSON.stringify(msg.patch, null, 2));
+      console.log('[sACN] patch/patch.json saved');
+      outputFixtures = msg.patch.map(p => ({ address: p.address }));
     }
   });
 });
 
-/** Open the sACN receiver on the chosen NIC/universe */
+/** Load patch into memory */
+function loadPatch() {
+  try {
+    const patch = JSON.parse(fs.readFileSync(patchFile));
+    outputFixtures = patch.map(p => ({ address: p.address }));
+    console.log(`[sACN] Loaded ${outputFixtures.length} fixtures from patch/patch.json`);
+  } catch {
+    console.log('[sACN] No valid patch/patch.json found; starting with zero fixtures');
+    outputFixtures = [];
+  }
+}
+
+/** Start listening for sACN packets */
 function setupReceiver() {
   if (udpSocket) udpSocket.close();
   udpSocket = dgram.createSocket('udp4');
+
   udpSocket.bind(SACN_PORT, () => {
     udpSocket.setBroadcast(true);
     udpSocket.setMulticastTTL(128);
-    udpSocket.addMembership(
-      `239.255.${(universe >> 8) & 0xff}.${universe & 0xff}`,
-      nic
-    );
+    const multicast = `239.255.${(universe >> 8) & 0xff}.${universe & 0xff}`;
+    udpSocket.addMembership(multicast, nic);
+    console.log(`[sACN] Listening on ${nic}:${SACN_PORT} → multicast ${multicast}`);
   });
+
   udpSocket.on('message', packet => {
-    const data = parseSacn(packet);
-    if (!data) return;
+    // removed per-packet log to avoid spam
+    const fixturesData = parseSacn(packet);
     wss.clients.forEach(c => {
       if (c.readyState === WebSocket.OPEN) {
-        c.send(JSON.stringify({ type: 'update', fixtures: data }));
+        c.send(JSON.stringify({ type: 'update', fixtures: fixturesData }));
       }
     });
   });
 }
 
-/** Stub parser—replace with real sACN decoding later */
+/** Simple sACN parser: use last 512 bytes */
 function parseSacn(packet) {
+  if (packet.length < 512) return [];
+  const sliceStart = packet.length - 512;
+  const dmx = Array.from(packet.slice(sliceStart, sliceStart + 512));
   return outputFixtures.map(({ address }) => ({
     id: `fixture-${address}`,
-    dmx: new Array(512).fill(0)
+    dmx
   }));
 }
 
