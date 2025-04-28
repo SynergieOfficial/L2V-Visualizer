@@ -132,9 +132,17 @@ function loadPatch() {
   fetch('/patch/patch.json')
     .then(res => res.json())
     .then(data => {
-      patch = data;
+      // Ensure every entry has x,y (default to 0,0)
+      patch = data.map(p => ({
+        ...p,
+        x: typeof p.x === 'number' ? p.x : 0,
+        y: typeof p.y === 'number' ? p.y : 0
+      }));
       renderPatchTable();
       rerenderFixtures();
+      
+      // Optionally persist defaults back
+      // savePatch();
     })
     .catch(err => console.error('[Client] Failed to load patch:', err));
 }
@@ -346,11 +354,12 @@ function removeFixture(index) {
 function rerenderFixtures() {
   const container = document.getElementById('fixture-container');
   container.innerHTML = '';
+  // Make sure the container is the positioning context
+  container.style.position = 'relative';
 
-  patch.forEach(({ fixtureType, universe, address }) => {
-    loadFixture(fixtureType, address, universe);
+  patch.forEach(({ fixtureType, universe, address, x, y }) => {
+    loadFixture(fixtureType, address, universe, x, y);
   });
-
 }
 
 function savePatchToDisk() {
@@ -370,7 +379,7 @@ function updateStatus(connected) {
  * address: number
  * universe: number
  */
-function loadFixture(type, address, universe) {
+function loadFixture(type, address, universe, x = 0, y = 0) {
   Promise.all([
     fetch(`/fixtures/${type}/template.html`).then(r => r.text()),
     fetch(`/fixtures/${type}/style.css`).then(r => r.text()),
@@ -385,6 +394,10 @@ function loadFixture(type, address, universe) {
     wrapper.dataset.universe    = universe;
     wrapper.dataset.fixtureType = type;
     wrapper.dataset.config      = JSON.stringify(config);
+    // Position absolutely at x,y
+    wrapper.style.position = 'absolute';
+    wrapper.style.left     = `${x}px`;
+    wrapper.style.top      = `${y}px`;
     wrapper.innerHTML = html;
     container.appendChild(wrapper);
 
