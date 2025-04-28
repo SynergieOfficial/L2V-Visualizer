@@ -2,6 +2,8 @@ let ws;
 let patch = []; // each item: { fixtureType, address, universe }
 let fixtureTypes = [];
 let sacnConnected = false;
+let pencilMode = false;
+let pencilIdx  = null;
 
 const fixtureConfigs = {};
 
@@ -188,14 +190,17 @@ function renderPatchTable() {
     // ✏️ Edit button
     const btnEdit = document.createElement('button');
     btnEdit.textContent = '✏️';
-    btnEdit.title = 'Edit universe/address';
+    btnEdit.title       = 'Edit universe → address';
     btnEdit.addEventListener('click', () => {
-      // find and click the address cell for this row
-      const tdAddr = document.querySelector(
-        `#patch-list-body td.editable-address[data-index="${i}"]`
+      // enter pencil mode on this row
+      pencilMode = true;
+      pencilIdx  = i;
+      // start by editing the universe cell
+      const uniTd = document.querySelector(
+        `#patch-list-body td.editable-universe[data-index="${i}"]`
       );
-      if (tdAddr) tdAddr.click();
-      else console.warn(`No address cell for patch row ${i}`);
+      if (uniTd) uniTd.click();
+      else console.warn('No universe cell for row', i);
     });
     tdAct.appendChild(btnEdit);
 
@@ -204,84 +209,80 @@ function renderPatchTable() {
   });
 }
 
-document.getElementById('patch-list-body')
-  .addEventListener('click', e => {
-    // find the <td>
-    const td = e.target.closest('td');
-    if (!td) return;
+document.getElementById('patch-list-body').addEventListener('click', e => {
+  const td = e.target.closest('td');
+  if (!td) return;
 
-    // only universe or address columns
-    const isUni  = td.classList.contains('editable-universe');
-    const isAdr = td.classList.contains('editable-address');
-    if (!isUni && !isAdr) return;
+  const isUni  = td.classList.contains('editable-universe');
+  const isAdr = td.classList.contains('editable-address');
+  if (!isUni && !isAdr) return;
 
-    const idx   = Number(td.dataset.index);
-    const field = isUni ? 'universe' : 'address';
-    const cur   = patch[idx][field];
+  const idx   = Number(td.dataset.index);
+  const field = isUni ? 'universe' : 'address';
+  const cur   = patch[idx][field];
 
-    // Swap the cell for a number <input>
-    td.innerHTML = `
-      <input
-        type="number"
-        min="1"
-        value="${cur}"
-        data-field="${field}"
-        data-index="${idx}"
-      >
-    `.trim();
+  td.innerHTML = `
+    <input
+      type="number"
+      min="1"
+      value="${cur}"
+      data-field="${field}"
+      data-index="${idx}"
+    >
+  `.trim();
 
-    const inp = td.querySelector('input');
-    inp.focus();
+  const inp = td.querySelector('input');
+  inp.focus();
 
-    // Called on blur or Enter
-    const commit = () => {
-      const val = parseInt(inp.value, 10);
-      if (isNaN(val) || val < 1) {
-        // invalid → revert
-        renderPatchTable();
-        rerenderFixtures();
-        return;
-      }
+  const commit = () => {
+    const val = parseInt(inp.value, 10);
+    if (isNaN(val) || val < 1) {
+      renderPatchTable();
+      rerenderFixtures();
+      return;
+    }
 
-      // only now check for conflicts
-      if (field === 'address' &&
-          conflictsWithExisting(
-            {
-              universe: patch[idx].universe,
-              address: val,
-              footprint: getFootprint(patch[idx].fixtureType)
-            },
-            idx  // skip self
-          )
-      ) {
-        alert('Address conflict');
-        renderPatchTable();
-        rerenderFixtures();
-        return;
-      }
-
-      // persist and re-render
+    // ── Pencil mode: after universe, open address
+    if (field === 'universe' && pencilMode && idx === pencilIdx) {
       patch[idx][field] = val;
       savePatch();
       renderPatchTable();
       rerenderFixtures();
 
-      // auto-open next address cell
-      if (field === 'address' && idx + 1 < patch.length) {
-        setTimeout(() => {
-          const nextTd = document.querySelector(
-            `#patch-list-body td.editable-address[data-index="${idx+1}"]`
-          );
-          if (nextTd) nextTd.click();
-        }, 0);
-      }
-    };
+      // now edit address of same row
+      setTimeout(() => {
+        const addrTd = document.querySelector(
+          `#patch-list-body td.editable-address[data-index="${idx}"]`
+        );
+        if (addrTd) addrTd.click();
+      }, 0);
+      return;
+    }
 
-    inp.addEventListener('blur', commit);
-    inp.addEventListener('keydown', ev => {
-      if (ev.key === 'Enter') inp.blur();
-    });
+    // ── Pencil mode: after address, finish and exit pencil mode
+    if (field === 'address' && pencilMode && idx === pencilIdx) {
+      patch[idx][field] = val;
+      savePatch();
+      renderPatchTable();
+      rerenderFixtures();
+
+      pencilMode = false;
+      pencilIdx  = null;
+      return;
+    }
+
+    // ── Normal cell edit (no auto-advance)
+    patch[idx][field] = val;
+    savePatch();
+    renderPatchTable();
+    rerenderFixtures();
+  };
+
+  inp.addEventListener('blur', commit);
+  inp.addEventListener('keydown', ev => {
+    if (ev.key === 'Enter') inp.blur();
   });
+});
 
 function reloadTable() {
   renderPatchTable();
