@@ -135,35 +135,33 @@ function loadPatch() {
   }
 }
 
-/**
- * Spawn one UDP socket per DMX universe in outputFixtures,
- * join the multicast group, parse e1.31 frames, and broadcast
- * updates over WebSockets.
- */
+/** Start listening for sACN packets */
 function setupReceivers() {
+  // Tear down any old sockets
+  Object.values(sockets).forEach(s => s.close());
+  Object.keys(sockets).forEach(u => delete sockets[u]);
+
   // Which universes do we need to listen on?
   const universes = [...new Set(outputFixtures.map(f => f.universe))];
   console.log('[sACN] setupReceivers → monitoring universes:', universes);
 
   universes.forEach(u => {
-    const sock = dgram.createSocket('udp4');
+    // Create a new multicast socket that allows address reuse
+    const sock = dgram.createSocket({ type: 'udp4', reuseAddr: true });
 
-    // Log any socket errors
     sock.on('error', err => {
       console.error(`[sACN] UDP socket error on U${u}:`, err);
     });
 
-    // Bind & join multicast
-    sock.bind(SACN_PORT, () => {
+    // Bind with exclusive: false so multiple sockets can share port 5568
+    sock.bind({ port: SACN_PORT, exclusive: false }, () => {
       const mcast = `239.255.${(u >> 8) & 0xff}.${u & 0xff}`;
       sock.addMembership(mcast, nic);
       console.log(`[sACN] Joined universe ${u} → ${mcast} on NIC ${nic}`);
     });
 
-    // Handle each incoming DMX (sACN) packet
     sock.on('message', packet => {
       console.log(`[sACN] 📨 UDP packet on U${u} (len=${packet.length})`);
-
       if (packet.length < 512) {
         console.warn(`[sACN] Dropping short packet (${packet.length} bytes) on U${u}`);
         return;
@@ -172,7 +170,6 @@ function setupReceivers() {
       const dmx = parseSacn(packet);
       console.log(`[sACN]   Parsed DMX frame (channels=${dmx.length}) for U${u}`);
 
-      // Build the fixtures array for this universe
       const fixtures = outputFixtures
         .filter(f => f.universe === u)
         .map(f => ({
@@ -180,7 +177,6 @@ function setupReceivers() {
           dmx
         }));
 
-      // Broadcast to all connected WS clients
       const payload = JSON.stringify({ type: 'update', universe: u, fixtures });
       console.log(
         `[sACN] ▶️ Broadcasting update to ${wss.clients.size} WS clients: U${u}, fixtures=${fixtures.length}`
@@ -192,6 +188,9 @@ function setupReceivers() {
         }
       });
     });
+
+    // Keep track so we can close on re-setup
+    sockets[u] = sock;
   });
 }
 
