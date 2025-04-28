@@ -195,41 +195,72 @@ function renderPatchTable() {
   });
 }
 
-document.getElementById('patch-list-body')
-  .addEventListener('click', e => {
-    const td = e.target.closest('td');
-    if (!td) return;
-    const idx = +td.dataset.index;
-    // only edit universe or address cells
-    if (td.classList.contains('editable-universe') ||
-        td.classList.contains('editable-address')) {
-      const field = td.classList.contains('editable-universe') ? 'universe' : 'address';
-      const cur   = patch[idx][field];
-      td.innerHTML = `<input type="number" min="1" value="${cur}" data-field="${field}" data-index="${idx}">`;
-      const inp = td.querySelector('input');
-      inp.focus();
+document.getElementById('patch-list-body').addEventListener('click', e => {
+  const td = e.target.closest('td');
+  if (!td) return;
 
-      const commit = () => {
-        const val = parseInt(inp.value,10);
-        if (isNaN(val) || val < 1) return reloadTable();
-        // conflict check on address change
-        if (field==='address' && conflictsWithExisting({
-              universe: patch[idx].universe,
-              address: val,
-              footprint: getFootprint(patch[idx].fixtureType)
-            })) {
-          alert('Address conflict'); return reloadTable();
-        }
-        patch[idx][field] = val;
-        savePatch();
-        renderPatchTable();
-        rerenderFixtures();
-      };
+  // only universe or address cells are editable
+  const isUni = td.classList.contains('editable-universe');
+  const isAddr = td.classList.contains('editable-address');
+  if (!isUni && !isAddr) return;
 
-      inp.addEventListener('blur', commit);
-      inp.addEventListener('keydown', ev => { if (ev.key==='Enter') inp.blur(); });
+  const idx   = parseInt(td.dataset.index, 10);
+  const field = isUni ? 'universe' : 'address';
+  const cur   = patch[idx][field];
+
+  // swap in an <input>
+  td.innerHTML = `<input
+    type="number" min="1"
+    value="${cur}"
+    data-field="${field}"
+    data-index="${idx}"
+  >`;
+
+  const inp = td.querySelector('input');
+  inp.focus();
+
+  // commit & validate
+  const commit = () => {
+    const val = parseInt(inp.value, 10);
+    if (isNaN(val) || val < 1) {
+      renderPatchTable();
+      rerenderFixtures();
+      return;
     }
+
+    if (field === 'address' && conflictsWithExisting({
+      universe: patch[idx].universe,
+      address: val,
+      footprint: getFootprint(patch[idx].fixtureType)
+    })) {
+      alert('Address conflict');
+      renderPatchTable();
+      rerenderFixtures();
+      return;
+    }
+
+    patch[idx][field] = val;
+    savePatch();
+    renderPatchTable();
+    rerenderFixtures();
+
+    // if it was an address edit, jump to the next row
+    if (field === 'address' && idx + 1 < patch.length) {
+      setTimeout(() => {
+        const nextTd = document.querySelector(
+          `#patch-list-body td.editable-address[data-index="${idx+1}"]`
+        );
+        if (nextTd) nextTd.click();
+      }, 0);
+    }
+  };
+
+  // commit on blur or Enter
+  inp.addEventListener('blur', commit);
+  inp.addEventListener('keydown', ev => {
+    if (ev.key === 'Enter') inp.blur();
   });
+});
 
 function reloadTable() {
   renderPatchTable();
@@ -376,34 +407,72 @@ function fetchNICs() {
     .catch(err => console.error('[Client] Failed to fetch NICs:', err));
 }
 
-document.getElementById('patch-list-body')
-  .addEventListener('click', e => {
-    const td = e.target;
-    if (!td.classList.contains('editable-address')) return;
+document.getElementById('patch-list-body').addEventListener('click', e => {
+  const td = e.target.closest('td');
+  if (!td) return;
 
-    const i = +td.dataset.index;
-    const current = patch[i].address;
-    td.innerHTML = `<input type="number" min="1" value="${current}" data-index="${i}">`;
-    const input = td.querySelector('input');
-    input.focus();
+  // only universe or address cells are editable
+  const isUni = td.classList.contains('editable-universe');
+  const isAddr = td.classList.contains('editable-address');
+  if (!isUni && !isAddr) return;
 
-    function commit() {
-      const newAddr = parseInt(input.value, 10);
-      if (newAddr > 0) {
-        patch[i].address = newAddr;
-        if (ws && ws.readyState === WebSocket.OPEN) {
-          ws.send(JSON.stringify({ type: 'save', patch }));
-        }
-      }
+  const idx   = parseInt(td.dataset.index, 10);
+  const field = isUni ? 'universe' : 'address';
+  const cur   = patch[idx][field];
+
+  // swap in an <input>
+  td.innerHTML = `<input
+    type="number" min="1"
+    value="${cur}"
+    data-field="${field}"
+    data-index="${idx}"
+  >`;
+
+  const inp = td.querySelector('input');
+  inp.focus();
+
+  // commit & validate
+  const commit = () => {
+    const val = parseInt(inp.value, 10);
+    if (isNaN(val) || val < 1) {
       renderPatchTable();
       rerenderFixtures();
+      return;
     }
 
-    input.addEventListener('blur', commit);
-    input.addEventListener('keydown', ev => {
-      if (ev.key === 'Enter') input.blur();
-    });
+    if (field === 'address' && conflictsWithExisting({
+      universe: patch[idx].universe,
+      address: val,
+      footprint: getFootprint(patch[idx].fixtureType)
+    })) {
+      alert('Address conflict');
+      renderPatchTable();
+      rerenderFixtures();
+      return;
+    }
+
+    patch[idx][field] = val;
+    savePatch();
+    renderPatchTable();
+    rerenderFixtures();
+
+    // if it was an address edit, jump to the next row
+    if (field === 'address' && idx + 1 < patch.length) {
+      setTimeout(() => {
+        const nextTd = document.querySelector(
+          `#patch-list-body td.editable-address[data-index="${idx+1}"]`
+        );
+        if (nextTd) nextTd.click();
+      }, 0);
+    }
+  };
+
+  // commit on blur or Enter
+  inp.addEventListener('blur', commit);
+  inp.addEventListener('keydown', ev => {
+    if (ev.key === 'Enter') inp.blur();
   });
+});
 
   function getFootprint(type) {
     // read the config.json footprint for this type
