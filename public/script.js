@@ -161,7 +161,7 @@ function renderPatchTable() {
   patch.forEach((f, i) => {
     const tr = document.createElement('tr');
 
-    // Type
+    // Type | Universe | Address
     ['fixtureType','universe','address'].forEach(key => {
       const td = document.createElement('td');
       td.textContent = f[key];
@@ -170,24 +170,33 @@ function renderPatchTable() {
       tr.appendChild(td);
     });
 
-    // Action
+    // ───── Action column ───────────────────────────────────────
     const tdAct = document.createElement('td');
+
+    // Delete button (already present)
     const btnDel = document.createElement('button');
-    btnDel.textContent = '🗑';
-    btnDel.title       = 'Remove fixture';
-    btnDel.dataset.idx = i;
+    btnDel.textContent = '🗑️';
+    btnDel.title = 'Remove fixture';
     btnDel.addEventListener('click', () => {
-      patch.splice(i,1);
+      patch.splice(i, 1);
       savePatch();
       renderPatchTable();
       rerenderFixtures();
     });
     tdAct.appendChild(btnDel);
 
+    // ✏️ Edit button
     const btnEdit = document.createElement('button');
     btnEdit.textContent = '✏️';
-    btnEdit.title       = 'Edit address/universe';
-    btnEdit.dataset.idx = i;
+    btnEdit.title = 'Edit universe/address';
+    btnEdit.addEventListener('click', () => {
+      // find and click the address cell for this row
+      const tdAddr = document.querySelector(
+        `#patch-list-body td.editable-address[data-index="${i}"]`
+      );
+      if (tdAddr) tdAddr.click();
+      else console.warn(`No address cell for patch row ${i}`);
+    });
     tdAct.appendChild(btnEdit);
 
     tr.appendChild(tdAct);
@@ -364,7 +373,7 @@ function processDMXUpdate({ universe, fixtures }) {
       });
     });
   });
-  console.log('[Client] processDMXUpdate() done');
+  //console.log('[Client] processDMXUpdate() done');
 }
 
 function applyRGB(el, channels) {
