@@ -233,6 +233,13 @@ document.getElementById('patch-list-body').addEventListener('click', e => {
 
   const inp = td.querySelector('input');
   inp.focus();
+  // move caret to end
+  if (typeof inp.setSelectionRange === 'function') {
+    setTimeout(() => {
+      const len = inp.value.length;
+      inp.setSelectionRange(len, len);
+    }, 0);
+  }
 
   const commit = () => {
     const val = parseInt(inp.value, 10);
