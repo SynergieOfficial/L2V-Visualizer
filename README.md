@@ -6,21 +6,21 @@ A web-based lighting visualizer for festival-grade DMX rigs. Mirror real sACN DM
 
 ## 🔹 Features
 
-- **Live sACN input** over UDP (port 5568) with real DMX parsing
-- **Network Interface (NIC) selection**: dynamically populated dropdown
-- **Universe selection**: choose and apply DMX universe at runtime
+- **Live sACN input** over UDP (port 5568) with real DMX parsing into 512-channel arrays
+- **Per‑fixture NIC & Universe**: select network interface globally; assign universe per fixture in the patch
 - **Patch management**:
   - Add/remove fixtures on the fly
-  - Persist patch data in `patch/patch.json`
-  - Auto-save via WebSocket on add/save
+  - Inline edit of address & universe in the patch table
+  - Overlap detection to prevent DMX channel conflicts
+  - Persist patch data in `patch/patch.json`, with automatic migration of legacy entries
 - **Modular fixtures**:
   - Each fixture in its own folder under `/fixtures`
   - HTML template, CSS, and `config.json` declare footprint, channels, and target elements
 - **Real-time rendering**:
-  - Per-fixture DMX offset (`base + channel - 1`)
-  - RGB color mapping via background-color
-  - Frost/glow effect as CSS `filter: blur(...)` when DMX > 0
-- **Clean UI**: no legacy box-shadow glow; performance throttling and UI improvements
+  - Per-fixture DMX offset (`base + attr.channel - 1`)
+  - RGB color mapping via `background-color`
+  - Frost/glow effect as CSS `filter: blur(...)` when value > 0
+- **Clean UI**: no legacy box-shadow glow; performance throttling and dynamic connect status indicator
 
 ---
 
@@ -40,8 +40,8 @@ A web-based lighting visualizer for festival-grade DMX rigs. Mirror real sACN DM
    node server.js
    ```
 4. **Open** `http://localhost:3000` in your browser.
-5. Click **⚙️ Settings**, select your NIC and universe, then **Apply**.
-6. **Add fixtures**, save the patch, and watch them light up!
+5. Click **⚙️ Settings**, select your NIC, then **Apply**.
+6. **Add fixtures** with their own universe & start addresses, save the patch, and watch them light up!
 
 ---
 
@@ -50,12 +50,12 @@ A web-based lighting visualizer for festival-grade DMX rigs. Mirror real sACN DM
 ```
 ├── fixtures/            # Fixture definitions (template.html, style.css, config.json)
 ├── patch/
-│   └── patch.json       # Current patch data (auto-read/write)
+│   └── patch.json       # Current patch data (auto-migrated & saved)
 ├── public/
 │   ├── index.html       # Main UI
 │   ├── script.js        # Client logic (WebSocket, DOM, DMX processing)
-│   └── style.css        # Global styles
-├── server.js            # Express + WebSocket + sACN receiver
+   └── style.css        # Global styles
+├── server.js            # Express + WebSocket + multi-universe sACN receiver
 ├── package.json
 └── README.md
 ```
@@ -64,70 +64,60 @@ A web-based lighting visualizer for festival-grade DMX rigs. Mirror real sACN DM
 
 ## 🏗️ Architecture Overview
 
-1. **sACN Input** via UDP socket (port 5568)
-2. **Node.js Server** (Express + `dgram`):
-   - Serves static files
+1. **sACN Input** via UDP socket(s) (one per universe)
+2. **Node.js Server** (Express + `dgram` + WebSocket):
+   - Serves static files and fixtures
    - `/nics` endpoint enumerates local IPv4 interfaces
-   - `/fixtures` lists available fixture types
-   - WebSocket server broadcasts DMX updates to clients
+   - Manages patch load/save with `patch/patch.json` (auto-migrates legacy entries)
+   - Listens on each patched universe’s multicast address and broadcasts `{type:'update', universe, fixtures}`
 3. **WebSocket Client** (browser):
-   - Requests NIC/universe connect
-   - Receives real-time DMX arrays per fixture
-   - Applies `processDMXUpdate`
+   - Connects to selected NIC
+   - Receives real-time DMX updates per-universe
+   - Heartbeat-based status indicator (🟢/🔴)
+   - Applies `processDMXUpdate()` to update fixture DOM elements
 4. **DOM Rendering**:
-   - Fixtures dynamically loaded from `/fixtures/{type}`
-   - Config-driven attributes: RGB, intensity, frost
+   - Fixtures loaded dynamically from `/fixtures/{type}`
+   - Config-driven attributes: RGB, intensity, frost (blur)
 
 ---
 
 ## 🏷️ Changelog
 
-| V0.1 | Simple NIC and Universe Settings. Background Color controlled by DMX. |
-| V0.2 | Settings Cog + Modal with Hide-on-Idle behavior. |
-| V0.3 | Fixture Type System: Dynamic Fixture Loading (HTML, CSS, Config). |
-| V0.3.1 | Modular folder structure for fixtures. |
-| V0.3.2 | BOLT1C fixture added with full plate and beam mapping. |
-| V0.4.1 | sACN Status Indicator added. |
-| V0.4.2 | Settings Persistence: NIC + Universe save and load. |
-| V0.4.3 | Refined Cog Auto-Hide Behavior. |
-| V0.5 | Start full Patch System (remove hardcoded fixtures). |
-| V0.5.8 | Dynamic Address-Based DMX Slicing. Real DMX patching finalized. TestSquare and BOLT1C fully live-controlled. |
+| Version     | Highlights                                                                                                     |
+| ----------- | -------------------------------------------------------------------------------------------------------------- |
+| v0.1        | Simple NIC and Universe settings; background color controlled by DMX.                                          |
+| v0.2        | Settings cog + modal with hide-on-idle behavior.                                                               |
+| v0.3        | Fixture type system: dynamic fixture loading (HTML, CSS, config).                                              |
+| v0.3.1      | Modular folder structure for fixtures.                                                                         |
+| v0.3.2      | **BOLT1C** fixture added with full plate and beam mapping.                                                     |
+| v0.4.1      | sACN status indicator added.                                                                                   |
+| v0.4.2      | Settings persistence: NIC + Universe save and load.                                                            |
+| v0.4.3      | Refined settings-cog auto-hide behavior.                                                                       |
+| v0.5        | Start of full patch system (remove hardcoded fixtures).                                                        |
+| v0.5.8      | Dynamic address-based DMX slicing; real DMX patching finalized; **TestSquare** and **BOLT1C** live-controlled. |
+| **v0.5.13** | Per-fixture Universe; inline address & universe editing; overlap detection; multi-universe sACN.               |
 
-### [0.5.11] – 2025-04-28
+---
 
-**🚀 Features**
-- NIC dropdown populated via `/nics` endpoint
-- sACN receiver binds to the selected NIC & universe, with console log on connect
-- Live-Add Fixture immediately WebSocket-saves so new fixtures light up without manual save
-- Patch persistence fully under `patch/patch.json` (load + save)
-- Real DMX parsing: last 512 bytes → DMX array for universe
-- Per-fixture offset: `base + (attr.channel–1)` ensures correct channel mapping
-- Frost effect now CSS `filter: blur(...)` only when value > 0
-- Removed legacy box-shadow glow; clean RGB background-color mapping
+## ❗ Known Issues (v0.5.x)
 
-**🛠 Bugfixes**
-- Fixed incorrect patch path casing (`/Patch/` → `/patch/`)
-- Removed per-packet spam logging, now only logs on connect & save
-- Corrected nested attribute targeting in `processDMXUpdate`
+- **Global Universe input** still present in UI—should be removed to avoid confusion.
+- **Status indicator** sometimes remains 🟢 after sACN stops if WebSocket closes silently; needs more robust heartbeat handling.
+- **Legacy patch entries** in `patch/patch.json` may not auto-migrate if file permissions prevent overwriting; manual migration might be required.
+- **WebSocket lifecycle**: closing the WS on every Apply can interrupt sACN updates; implement a persistent connection or debounced Apply.
+- **Performance**: rendering many fixtures (>50) can degrade framerate; throttling and virtualization planned for future releases.
 
 ---
 
 ## 🔮 Roadmap (v0.6+)
 
 - **Spatial layout**: assign X/Y positions and group fixtures on a virtual grid
-- **Multi-universe**: support patching & rendering across multiple DMX universes
-- **Advanced frost**: directional blur or box-shadow accents per `config.json`
-- **Art-Net support**: ingest and parse Art-Net packets in addition to sACN
-- **Performance metrics**: FPS counter, throttling strategies
+- **Art‑Net support**: ingest and parse Art‑Net alongside sACN
+- **Advanced frost**: directional blur or beam-specific glow per `config.json`
+
+
 
 ---
-
-## 🤝 Contributing
-
-1. Fork the repo
-2. Create a feature branch
-3. Submit a PR with clear description & testing steps
-4. Discuss on issues and iterate
 
 ---
 
