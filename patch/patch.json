@@ -1,19 +1,5 @@
 [
-  {
-    "fixtureType": "TestSquare",
-    "address": 1
-  },
-  {
-    "fixtureType": "BOLT1C",
-    "address": 41
-  },
-  {
-    "fixtureType": "TestSquare",
-    "address": 201,
-    "id": "fixture-201"
-  },
-  {
-    "fixtureType": "TestSquare",
-    "address": 301
-  }
+  { "fixtureType": "TestSquare", "universe": 1, "address": 1 },
+  { "fixtureType": "BOLT1C",     "universe": 1, "address": 41 },
+  { "fixtureType": "TestSquare", "universe": 1, "address": 201 }
 ]
