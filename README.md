@@ -103,6 +103,19 @@ A web-based lighting visualizer for festival-grade DMX rigs. Mirror real sACN DM
 - **v0.5** – Inline editing, overlap detection, debug logging, and performance improvements.
 
 ## Known Issues
+
+Based on v0.6 testing, here are the outstanding issues:
+
+1. **Migration Save Timing:** default `x,y` coordinates are only saved *after* WebSocket opens; if WS setup fails, `patch.json` may not be updated.
+2. **Control ID Mismatch:** grid-width/height inputs must match the JS IDs (`grid-width-input`/`grid-height-input`) or their listeners won’t fire, preventing the grid from redrawing or snapping to updated values.
+3. **Grid Visibility Toggle:** `updateGridVisibility()` must be invoked immediately after `drawGrid()` and tied to the correct checkbox ID, or the overlay will never appear.
+4. **Drag-and-Snap Defaults:** until grid-spacing controls work, fixtures only snap using fallback defaults (50px); users may see unexpected positioning if they change the inputs but listeners fail.
+5. **Fixture Visibility in Edit Mode:** on dark backgrounds fixtures can be hard to see; the dashed outline depends on the `data-layout-edit` attribute being toggled correctly.
+6. **Click Handler Errors:** accidental placeholder `addEventListener` calls with missing arguments will throw type errors and prevent subsequent code from executing.
+
+Please refer to the v0.6 branch commits for the fixes in flight; these Known Issues will be cleared out in v0.6.1 after address ID mismatch and timing fixes are merged.
+
+---
 - Global Universe input still present in UI—should be removed to avoid confusion
 - Legacy patch entries in `patch/patch.json` may not auto-migrate if file permissions prevent overwriting; manual migration might be required
 - Performance: rendering many fixtures (>50) can degrade framerate; throttling and virtualization planned for future releases
