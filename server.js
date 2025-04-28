@@ -60,7 +60,7 @@ wss.on('connection', ws => {
     if (msg.type === 'connect') {
       nic = msg.nic;
       console.log(`[sACN] Client connected → NIC=${nic}`);
-      loadPatch();
+      loadPatch();           // seeds outputFixtures with {universe, address}
       setupReceivers();
       ws.send(JSON.stringify({ type: 'status', connected: true }));
     }
@@ -139,15 +139,18 @@ function setupReceivers() {
           dmx
         }));
     
-      wss.clients.forEach(c => {
-        if (c.readyState === WebSocket.OPEN) {
-          c.send(JSON.stringify({
-            type: 'update',      // ← new
-            universe: u,
-            fixtures
-          }));
-        }
-      });
+        wss.clients.forEach(c => {
+          if (c.readyState === WebSocket.OPEN) {
+            c.send(JSON.stringify({
+              type: 'update',
+              universe: u,
+              fixtures: fixtures.map(f => ({
+                id: f.id,
+                dmx: parseSacn(packet)
+              }))
+            }));
+          }
+        });
     });
     sockets[u] = sock;
   });
