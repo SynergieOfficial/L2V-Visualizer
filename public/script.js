@@ -105,10 +105,33 @@ function addFixture() {
 function renderPatchTable() {
   const tbody = document.getElementById('patch-list-body');
   tbody.innerHTML = '';
-  patch.forEach(({ fixtureType, address }) => {
-    const row = document.createElement('tr');
-    row.innerHTML = `<td>${fixtureType}</td><td>${address}</td>`;
-    tbody.appendChild(row);
+
+  patch.forEach(({ fixtureType, address }, i) => {
+    const tr = document.createElement('tr');
+
+    // Fixture type
+    const tdType = document.createElement('td');
+    tdType.textContent = fixtureType;
+    tr.appendChild(tdType);
+
+    // Start address (click→edit)
+    const tdAddr = document.createElement('td');
+    tdAddr.textContent = address;
+    tdAddr.classList.add('editable-address');
+    tdAddr.dataset.index = i;
+    tr.appendChild(tdAddr);
+
+    // Action (remove)
+    const tdAction = document.createElement('td');
+    const btn = document.createElement('button');
+    btn.textContent = '🗑';
+    btn.title = 'Remove fixture';
+    btn.dataset.index = i;
+    btn.addEventListener('click', () => removeFixture(i));
+    tdAction.appendChild(btn);
+    tr.appendChild(tdAction);
+
+    tbody.appendChild(tr);
   });
 }
 
@@ -219,4 +242,47 @@ function fetchNICs() {
       });
     })
     .catch(err => console.error('[Client] Failed to fetch NICs:', err));
+}
+
+document.getElementById('patch-list-body')
+  .addEventListener('click', e => {
+    const td = e.target;
+    if (!td.classList.contains('editable-address')) return;
+
+    const i = parseInt(td.dataset.index, 10);
+    const current = patch[i].address;
+    td.innerHTML = `<input type="number" min="1" value="${current}" data-index="${i}" />`;
+
+    const input = td.querySelector('input');
+    input.focus();
+
+    // Commit on blur or Enter
+    input.addEventListener('blur', commitAddressEdit);
+    input.addEventListener('keydown', ev => {
+      if (ev.key === 'Enter') input.blur();
+    });
+  });
+
+function commitAddressEdit(e) {
+  const input = e.target;
+  const i = parseInt(input.dataset.index, 10);
+  const newAddr = parseInt(input.value, 10);
+
+  if (!isNaN(newAddr) && newAddr > 0) {
+    patch[i].address = newAddr;
+    // Save & rerender
+    if (ws && ws.readyState === WebSocket.OPEN) {
+      ws.send(JSON.stringify({ type: 'save', patch }));
+    }
+  }
+  renderPatchTable();
+  rerenderFixtures();
+}
+
+function rerenderFixtures() {
+  const container = document.getElementById('fixture-container');
+  container.innerHTML = '';
+  patch.forEach(({ fixtureType, address }) => {
+    loadFixture(fixtureType, address);
+  });
 }
