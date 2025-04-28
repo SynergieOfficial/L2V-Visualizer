@@ -9,6 +9,7 @@ let layoutEditMode = JSON.parse(localStorage.getItem('layoutEditMode') || 'false
 let gridWidth      = parseInt(localStorage.getItem('gridWidth')  || '50', 10);
 let gridHeight     = parseInt(localStorage.getItem('gridHeight') || '50', 10);
 let dragState = null;
+let migrationPending = false;
 
 const fixtureConfigs = {};
 const DISCONNECT_TIMEOUT = 5000;
@@ -91,6 +92,11 @@ function applySettings() {
     console.log('[Client] WebSocket connected');
     ws.send(JSON.stringify({ type: 'connect', nic }));
     // start the 5s “no‐data” timeout
+    if (migrationPending) {
+      savePatch();
+      migrationPending = false;
+      console.log('[Client] Saved migrated x,y to server');
+    }
     updateStatus(false);
     clearTimeout(disconnectTimer);
     disconnectTimer = setTimeout(() => updateStatus(false), DISCONNECT_TIMEOUT);
@@ -167,7 +173,8 @@ function loadPatch() {
       rerenderFixtures();
       if (migrated) {
         savePatch(); // persist defaults back to the server
-        console.log('[Client] Migrated missing x,y → patch.json updated');
+        migrationPending = true;
+        console.log('[Client] Migrated missing x,y → will save after WS open');
       }
     })
     .catch(err => console.error('[Client] Failed to load patch:', err));
@@ -565,9 +572,11 @@ function drawGrid() {
 }
 function updateGridVisibility() {
   gridCanvas.style.display = layoutEditMode ? 'block' : 'none';
+  fixtureContainer.setAttribute('data-layout-edit', layoutEditMode);
 }
 
 // Initial draw + handle window resizes
+updateGridVisibility();
 resizeCanvas();
 drawGrid();
 window.addEventListener('resize', () => {
@@ -665,3 +674,6 @@ document.addEventListener('mouseup', e => {
   dragState = null;
   document.body.style.cursor = '';
 });
+
+if (gridWidthInput)  gridWidthInput.addEventListener('input', /*…*/);
+if (gridHeightInput) gridHeightInput.addEventListener('input', /*…*/);
