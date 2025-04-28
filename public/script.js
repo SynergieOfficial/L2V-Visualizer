@@ -489,14 +489,15 @@ document.getElementById('patch-list-body').addEventListener('click', e => {
     return cfg ? cfg.footprint : 0;
   }
   
-  function conflictsWithExisting({ universe, address, footprint }) {
-    return patch.some(f => {
-      if (f.universe !== universe) return false;
-      // overlap if ranges [address, address+footprint-1] intersect
-      return (address <= f.address + footprint - 1) &&
-             (f.address <= address + footprint - 1);
-    });
-  }
+function conflictsWithExisting({ universe, address, footprint }, ignoreIndex) {
+  return patch.some((f, idx) => {
+    if (idx === ignoreIndex) return false;       // <<< don’t conflict with yourself
+    if (f.universe !== universe) return false;   
+    // overlap test:
+    return (address <= f.address + footprint - 1) &&
+           (f.address <= address + footprint - 1);
+  });
+}
   
   function savePatch() {
     if (ws && ws.readyState === WebSocket.OPEN) {
