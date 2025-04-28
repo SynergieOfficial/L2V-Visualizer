@@ -64,14 +64,10 @@ function applySettings() {
   ws.onopen = () => {
     console.log('[Client] WebSocket connected');
     ws.send(JSON.stringify({ type: 'connect', nic }));
+    // start the 5s “no‐data” timeout
     updateStatus(false);
-
-    // start a ping‐pong heartbeat every 5s
-    setInterval(() => {
-      if (ws.readyState === WebSocket.OPEN) {
-        ws.send(JSON.stringify({ type: 'ping' }));
-      }
-    }, 5000);
+    clearTimeout(disconnectTimer);
+    disconnectTimer = setTimeout(() => updateStatus(false), DISCONNECT_TIMEOUT);
   };
 
   ws.onmessage = (event) => {
@@ -80,6 +76,7 @@ function applySettings() {
     console.log('[Client] ws.onmessage parsed →', data);
 
     if (data.type === 'status') {
+      // server connection ack
       updateStatus(data.connected);
 
     } else if (data.type === 'update') {
@@ -89,13 +86,7 @@ function applySettings() {
       disconnectTimer = setTimeout(() => updateStatus(false), DISCONNECT_TIMEOUT);
       console.log('[Client] calling processDMXUpdate for universe', data.universe, 'with', data.fixtures.length, 'fixtures');
       processDMXUpdate(data);
-
-    } else if (data.type === 'pong') {
-      // heartbeat reply: keep “Connected”
-      updateStatus(true);
-      clearTimeout(disconnectTimer);
-      disconnectTimer = setTimeout(() => updateStatus(false), DISCONNECT_TIMEOUT);
-    }
+      }
   };
 
   ws.onclose = () => {
