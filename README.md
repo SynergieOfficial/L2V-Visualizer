@@ -99,13 +99,6 @@ A web-based lighting visualizer for festival-grade DMX rigs. Mirror real sACN DM
 
 ---
 
-## ❗ Known Issues (v0.5.x)
-
-- **Global Universe input** still present in UI—should be removed to avoid confusion.
-- **Status indicator** sometimes remains 🟢 after sACN stops if WebSocket closes silently; needs more robust heartbeat handling.
-- **Legacy patch entries** in `patch/patch.json` may not auto-migrate if file permissions prevent overwriting; manual migration might be required.
-- **WebSocket lifecycle**: closing the WS on every Apply can interrupt sACN updates; implement a persistent connection or debounced Apply.
-- **Performance**: rendering many fixtures (>50) can degrade framerate; throttling and virtualization planned for future releases.
 
 ---
 
