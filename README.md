@@ -1,164 +1,126 @@
-# Q2LED-Visualizer
+# L2V-Visualizer
 
-## Scope
-
-The L2V-Visualizer is a festival-grade lighting visualization engine designed to emulate real-life fixtures onto LED walls and large screens.  
-It allows live DMX/sACN control of virtual lighting fixtures, dynamically expanding the real-world rig with visual augmentation.
-
-👉 Receives live sACN DMX data  
-👉 Patches fixtures dynamically  
-👉 Modular fixture system (HTML, CSS, config per fixture)  
-👉 Frost, RGB, Intensity, and Intensity+RGB supported  
-👉 Live WebSocket DMX updating  
-👉 Dynamic address slicing per fixture  
+A web-based lighting visualizer for festival-grade DMX rigs. Mirror real sACN DMX inputs in the browser, patch fixtures live, and preview your show virtually.
 
 ---
 
-## 🎯 Fixture Config Philosophy
+## 🔹 Features
 
-Each fixture defines:
-
-- `footprint`: total number of DMX channels it uses (real world accurate)
-- `attributes`: list of attributes like `intensity`, `rgb`, `frost`
-- `channel`: starting DMX channel for the attribute
-- `elements`: list of HTML element IDs to apply DMX changes onto
-
-Fixture templates have:
-
-- HTML markup (template.html)
-- CSS styling (style.css)
-- ID references for DMX-controlled parts
-
-### Frost Handling
-- Frost attributes can affect **multiple elements together** (plates, beams, etc.)
-- Directional or global frost glow simulated via box-shadow with adjustable opacity.
-
-### Dynamic Address Slicing
-- Every fixture receives its own **correct slice** of the incoming DMX universe based on its **starting address** and **footprint**.
-- Fixture IDs are either assigned manually or auto-generated (`fixture-<address>` fallback).
-
-### Real World Patching
-- Fixtures are patched at their real DMX start addresses.
-- Total footprint ensures visualizer behaves predictably compared to real lighting desks.
+- **Live sACN input** over UDP (port 5568) with real DMX parsing
+- **Network Interface (NIC) selection**: dynamically populated dropdown
+- **Universe selection**: choose and apply DMX universe at runtime
+- **Patch management**:
+  - Add/remove fixtures on the fly
+  - Persist patch data in `patch/patch.json`
+  - Auto-save via WebSocket on add/save
+- **Modular fixtures**:
+  - Each fixture in its own folder under `/fixtures`
+  - HTML template, CSS, and `config.json` declare footprint, channels, and target elements
+- **Real-time rendering**:
+  - Per-fixture DMX offset (`base + channel - 1`)
+  - RGB color mapping via background-color
+  - Frost/glow effect as CSS `filter: blur(...)` when DMX > 0
+- **Clean UI**: no legacy box-shadow glow; performance throttling and UI improvements
 
 ---
 
-## 🛠️ Current Architecture Overview
+## 🚀 Quick Start
+
+1. **Clone the repo**:
+   ```bash
+   git clone https://github.com/SynergieOfficial/L2V-Visualizer.git
+   cd L2V-Visualizer
+   ```
+2. **Install dependencies**:
+   ```bash
+   npm install
+   ```
+3. **Run the server**:
+   ```bash
+   node server.js
+   ```
+4. **Open** `http://localhost:3000` in your browser.
+5. Click **⚙️ Settings**, select your NIC and universe, then **Apply**.
+6. **Add fixtures**, save the patch, and watch them light up!
+
+---
+
+## 📁 Project Structure
 
 ```
-sACN DMX Input
-    ↓
-Node.js Server (UDP Listener)
-    ↓
-Dynamic Fixture Patch Loader
-    ↓
-WebSocket Broadcast to Clients
-    ↓
-Client Receives Patch and DMX
-    ↓
-Client Injects Fixtures (Template + CSS + Config)
-    ↓
-Client Applies Live Visual Changes (RGB, Frost, Intensity)
+├── fixtures/            # Fixture definitions (template.html, style.css, config.json)
+├── patch/
+│   └── patch.json       # Current patch data (auto-read/write)
+├── public/
+│   ├── index.html       # Main UI
+│   ├── script.js        # Client logic (WebSocket, DOM, DMX processing)
+│   └── style.css        # Global styles
+├── server.js            # Express + WebSocket + sACN receiver
+├── package.json
+└── README.md
 ```
 
 ---
 
-# L2V Visualizer
+## 🏗️ Architecture Overview
 
-A web-based visualizer for sACN DMX lighting systems.
-
-## Project Purpose
-This project aims to provide a scalable and responsive visual representation of a lighting rig, driven in real-time by sACN DMX data.
-
-## Setup Instructions
-1. Install dependencies:
-```bash
-npm install
-```
-2. Start the server:
-```bash
-node server.js
-```
-3. Access the client:
-Open `http://localhost:3000` in your web browser.
-
-## Folder Structure
-- `/Fixtures/`: Contains folders for each fixture type (HTML, CSS, and configuration files).
-- `/Patch/patch.json`: Stores the current patch list.
-- `server.js`: Node.js backend that handles sACN, WebSocket server, and file serving.
-- `script.js`: Frontend logic for managing fixtures, settings, and receiving sACN updates.
-- `style.css`: Base styling.
-
-## Version History
-
-### v0.5.0 - Initial Visualizer Setup
-- WebSocket server and client communication.
-- Basic sACN receiver (UDP socket on port 5568).
-- Background color visualization via DMX RGB.
-
-### v0.5.1 - Settings Menu
-- NIC selection dropdown.
-- Universe input field.
-- Apply button to connect to the sACN network.
-- sACN status indicator.
-
-### v0.5.2 - Patch System Started
-- Read patch list from `patch.json`.
-- Render patch table inside the settings modal.
-
-### v0.5.3 - Fixture Rendering System
-- Support for fixture templates and CSS loading based on type.
-- Dynamic rendering of fixtures based on patch.
-
-### v0.5.4 - Attribute Application System
-- Basic attributes implemented:
-  - Intensity (opacity)
-  - RGB (background color)
-  - Frost (blur)
-
-### v0.5.5 - Improved Patch and Fixtures
-- Added TestSquare fixture.
-- Added BOLT1C fixture with full attribute mapping.
-
-### v0.5.6 - Clean UI Improvements
-- Black background.
-- Responsive scaling of fixture layout.
-- Settings button hiding and hover behavior.
-
-### v0.5.7 - Server & Client Stability
-- Organized server code structure.
-- Improved error handling.
-- Ensured reconnect behavior for WebSocket.
-
-### v0.5.8 - Patch Saving
-- Button to save the current patch into `/Patch/patch.json`.
-- Added WebSocket server command to handle patch saving.
-
-### v0.5.9 - Minor Visual Improvements
-- Patch table formatting.
-- NIC and Universe fields styled.
-- Confirmed working patch display.
-
-### v0.5.10 - Adding Fixtures from Frontend
-- Dropdown to select fixture type from available fixtures.
-- Input field for address.
-- Add button to dynamically add a new fixture.
-- Updated patch table live.
-
-### v0.5.11 - Patch & Fixture Stability (Current Work)
-- Improved fixture dynamic rendering.
-- Refactored DMX update handling based on fixture config.
-- Correct loading of patch from `/Patch/patch.json`.
-- Rebuild of WebSocket message system.
-- Critical bug: Fixtures are rendered visually but do not respond to sACN DMX updates yet.
-
-## Known Issues
-- Fixtures render but attributes do not update from DMX frames (working on it!).
-- Settings menu may need some small CSS/JS improvements for better UX.
-- Bug in current version, NIC selection dropdown is empty
+1. **sACN Input** via UDP socket (port 5568)
+2. **Node.js Server** (Express + `dgram`):
+   - Serves static files
+   - `/nics` endpoint enumerates local IPv4 interfaces
+   - `/fixtures` lists available fixture types
+   - WebSocket server broadcasts DMX updates to clients
+3. **WebSocket Client** (browser):
+   - Requests NIC/universe connect
+   - Receives real-time DMX arrays per fixture
+   - Applies `processDMXUpdate`
+4. **DOM Rendering**:
+   - Fixtures dynamically loaded from `/fixtures/{type}`
+   - Config-driven attributes: RGB, intensity, frost
 
 ---
 
-> Next Step: Finish v0.5.11 patching and fully restore sACN visual updates to fixtures.
+## 🏷️ Changelog
 
+### [0.5.11] – 2025-04-28
+
+**🚀 Features**
+- NIC dropdown populated via `/nics` endpoint
+- sACN receiver binds to the selected NIC & universe, with console log on connect
+- Live-Add Fixture immediately WebSocket-saves so new fixtures light up without manual save
+- Patch persistence fully under `patch/patch.json` (load + save)
+- Real DMX parsing: last 512 bytes → DMX array for universe
+- Per-fixture offset: `base + (attr.channel–1)` ensures correct channel mapping
+- Frost effect now CSS `filter: blur(...)` only when value > 0
+- Removed legacy box-shadow glow; clean RGB background-color mapping
+
+**🛠 Bugfixes**
+- Fixed incorrect patch path casing (`/Patch/` → `/patch/`)
+- Removed per-packet spam logging, now only logs on connect & save
+- Corrected nested attribute targeting in `processDMXUpdate`
+
+---
+
+## 🔮 Roadmap (v0.6+)
+
+- **Spatial layout**: assign X/Y positions and group fixtures on a virtual grid
+- **Multi-universe**: support patching & rendering across multiple DMX universes
+- **Advanced frost**: directional blur or box-shadow accents per `config.json`
+- **Art-Net support**: ingest and parse Art-Net packets in addition to sACN
+- **Performance metrics**: FPS counter, throttling strategies
+
+---
+
+## 🤝 Contributing
+
+1. Fork the repo
+2. Create a feature branch
+3. Submit a PR with clear description & testing steps
+4. Discuss on issues and iterate
+
+---
+
+## 📜 License
+
+MIT © SynergieOfficial
 
