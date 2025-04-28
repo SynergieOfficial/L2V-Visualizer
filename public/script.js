@@ -453,7 +453,7 @@ document.getElementById('patch-list-body').addEventListener('click', e => {
       universe: patch[idx].universe,
       address: val,
       footprint: getFootprint(patch[idx].fixtureType)
-    })) {
+    }, idx)) {
       alert('Address conflict');
       renderPatchTable();
       rerenderFixtures();
