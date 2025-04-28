@@ -72,6 +72,9 @@ wss.on('connection', ws => {
         universe: p.universe,
         address: p.address
       }));
+    } else if (msg.type === 'ping') {
+            // reply so the client can reset its timeout
+            ws.send(JSON.stringify({ type: 'pong' }));
     }
   });
 });

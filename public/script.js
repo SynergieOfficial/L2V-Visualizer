@@ -49,36 +49,46 @@ function setupSettingsMenu() {
 
 function applySettings() {
   const nic = document.getElementById('nic').value;
-  // we no longer read a global universe here—each fixture carries its own
-  if (ws) ws.close();
 
+  // — if there’s already an open WS, just tell it to switch NIC
+  if (ws && ws.readyState === WebSocket.OPEN) {
+    ws.send(JSON.stringify({ type: 'connect', nic }));
+    return;
+  }
+
+  // — otherwise create it once
   ws = new WebSocket(`ws://${location.host}`);
-
   ws.onopen = () => {
     console.log('[Client] WebSocket connected');
-    ws.send(JSON.stringify({
-      type: 'connect',
-      nic: nic
-      // no global universe
-    }));
-    updateStatus(false);     // now matches our renamed function
+    ws.send(JSON.stringify({ type: 'connect', nic }));
+    updateStatus(false);
+
+    // start a ping‐pong heartbeat every 5s
+    setInterval(() => {
+      if (ws.readyState === WebSocket.OPEN) {
+        ws.send(JSON.stringify({ type: 'ping' }));
+      }
+    }, 5000);
   };
 
   ws.onmessage = (event) => {
     const data = JSON.parse(event.data);
 
     if (data.type === 'status') {
-      // server confirms connect/disconnect
       updateStatus(data.connected);
 
     } else if (data.type === 'update') {
-      // heartbeat: mark connected and reset the 5s disconnect timer
+      // mark alive + reset our 5s timeout
       updateStatus(true);
       clearTimeout(disconnectTimer);
       disconnectTimer = setTimeout(() => updateStatus(false), DISCONNECT_TIMEOUT);
-
-      // now render the actual DMX update (expects { universe, fixtures })
       processDMXUpdate(data);
+
+    } else if (data.type === 'pong') {
+      // heartbeat reply: keep “Connected”
+      updateStatus(true);
+      clearTimeout(disconnectTimer);
+      disconnectTimer = setTimeout(() => updateStatus(false), DISCONNECT_TIMEOUT);
     }
   };
 
@@ -86,7 +96,6 @@ function applySettings() {
     console.log('[Client] WebSocket closed');
     updateStatus(false);
   };
-
   ws.onerror = (err) => {
     console.error('[Client] WebSocket error', err);
     updateStatus(false);
