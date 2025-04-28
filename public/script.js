@@ -3,6 +3,8 @@ let patch = []; // each item: { fixtureType, address, universe }
 let fixtureTypes = [];
 let sacnConnected = false;
 
+const fixtureConfigs = {};
+
 window.onload = () => {
   setupSettingsMenu();
   fetchNICs();
@@ -56,19 +58,29 @@ function applySettings() {
 }
 
 function fetchFixtureTypes() {
-  fetch('/fixtures/')
+  fetch('/fixtures')
     .then(res => res.json())
     .then(types => {
-      fixtureTypes = types;
       const select = document.getElementById('fixture-type-select');
       select.innerHTML = '';
+
       types.forEach(type => {
-        const option = document.createElement('option');
-        option.value = type;
-        option.innerText = type;
-        select.appendChild(option);
+        // populate dropdown
+        const opt = document.createElement('option');
+        opt.value = type;
+        opt.text  = type;
+        select.appendChild(opt);
+
+        // fetch and cache its config
+        fetch(`/fixtures/${type}/config.json`)
+          .then(r => r.json())
+          .then(cfg => {
+            fixtureConfigs[type] = cfg;
+          })
+          .catch(err => console.error(`Failed to load config for ${type}:`, err));
       });
-    });
+    })
+    .catch(err => console.error('[Client] Failed to fetch fixture types:', err));
 }
 
 function loadPatch() {
@@ -192,8 +204,8 @@ function removeFixture(index) {
 function rerenderFixtures() {
   const container = document.getElementById('fixture-container');
   container.innerHTML = '';
-  patch.forEach(({ fixtureType, address }) => {
-    loadFixture(fixtureType, address);
+  patch.forEach(({ fixtureType, universe, address }) => {
+    loadFixture(fixtureType, address, universe);
   });
 }
 
@@ -217,8 +229,9 @@ function loadFixture(type, address) {
   ]).then(([html, css, config]) => {
     const container = document.getElementById('fixture-container');
     const wrapper = document.createElement('div');
-    wrapper.id = `fixture-${address}`;
+    wrapper.id = `fixture-${universe}-${address}`;
     wrapper.dataset.address = address;
+    wrapper.dataset.universe = universe;
     wrapper.dataset.fixtureType = type;
     wrapper.dataset.config = JSON.stringify(config);
     wrapper.innerHTML = html;
@@ -230,8 +243,8 @@ function loadFixture(type, address) {
   }).catch(err => console.error(`[Client] Failed loading fixture ${type}:`, err));
 }
 
-function processDMXUpdate(fixtures) {
-  fixtures.forEach(({ universe, id, dmx }) => {
+function processDMXUpdate({ universe, fixtures }) {
+  fixtures.forEach(({ id, dmx }) => {
     const wrapper = document.getElementById(id);
     if (!wrapper) return;
 
