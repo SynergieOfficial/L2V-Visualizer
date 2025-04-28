@@ -17,6 +17,19 @@ window.onload = () => {
           .addEventListener('click', savePatchToDisk);
 };
 
+let lastPacketTimer = null;
+let disconnectTimer;
+const DISCONNECT_TIMEOUT = 5000;
+
+function setStatus(connected) {
+  const el = document.getElementById('sacn-status');
+  if (connected) {
+    el.textContent = 'Status: 🟢 Connected';
+  } else {
+    el.textContent = 'Status: 🔴 Disconnected';
+  }
+}
+
 function setupSettingsMenu() {
   const settingsIcon = document.getElementById('settings-icon');
   const settingsModal = document.getElementById('settings-modal');
@@ -36,24 +49,48 @@ function setupSettingsMenu() {
 
 function applySettings() {
   const nic = document.getElementById('nic').value;
-  const universe = document.getElementById('universe').value;
-
+  // we no longer read a global universe here—each fixture carries its own
   if (ws) ws.close();
 
   ws = new WebSocket(`ws://${location.host}`);
 
   ws.onopen = () => {
     console.log('[Client] WebSocket connected');
-    ws.send(JSON.stringify({ type: 'connect', nic, universe }));
+    ws.send(JSON.stringify({
+      type: 'connect',
+      nic: nic
+      // no global universe
+    }));
+    // set status to waiting until first packet arrives
+    updateStatus(false);
   };
 
   ws.onmessage = (event) => {
     const data = JSON.parse(event.data);
+
     if (data.type === 'status') {
+      // server confirms connect/disconnect
       updateStatus(data.connected);
+
     } else if (data.type === 'update') {
-      processDMXUpdate(data.fixtures);
+      // heartbeat: mark connected and reset the 5s disconnect timer
+      updateStatus(true);
+      clearTimeout(disconnectTimer);
+      disconnectTimer = setTimeout(() => updateStatus(false), DISCONNECT_TIMEOUT);
+
+      // now render the actual DMX update (expects { universe, fixtures })
+      processDMXUpdate(data);
     }
+  };
+
+  ws.onclose = () => {
+    console.log('[Client] WebSocket closed');
+    updateStatus(false);
+  };
+
+  ws.onerror = (err) => {
+    console.error('[Client] WebSocket error', err);
+    updateStatus(false);
   };
 }
 
