@@ -140,18 +140,43 @@ function loadPatch() {
 }
 
 function addFixture() {
-  const type    = document.getElementById('fixture-type-select').value;
-  const uni     = parseInt(document.getElementById('fixture-universe-input').value, 10);
-  const addr    = parseInt(document.getElementById('fixture-address-input').value, 10);
-  if (!type || isNaN(uni) || isNaN(addr)) return alert('Type, universe & address required');
-
-  // overlap check
-  if (conflictsWithExisting({ universe:uni, address:addr, footprint:getFootprint(type) })) {
-    return alert('DMX address conflict in universe '+uni);
+  const type = document.getElementById('fixture-type-select').value;
+  const uni  = parseInt(document.getElementById('fixture-universe-input').value, 10);
+  const addr = parseInt(document.getElementById('fixture-address-input').value, 10);
+  if (!type || isNaN(uni) || isNaN(addr)) {
+    return alert('Type, universe & address required');
   }
 
-  patch.push({ fixtureType:type, universe:uni, address:addr });
-  savePatch();        // tells server and writes to disk
+  // DMX overlap check
+  if (conflictsWithExisting({
+    universe: uni,
+    address: addr,
+    footprint: getFootprint(type)
+  })) {
+    return alert('DMX address conflict in universe ' + uni);
+  }
+
+  // ── Compute default X/Y based on last fixture
+  // Read your grid-spacing inputs (fallback to 50px if not yet implemented)
+  const gridW = parseInt(document.getElementById('grid-width')?.value, 10) || 50;
+  const gridH = parseInt(document.getElementById('grid-height')?.value, 10) || 50;
+
+  let x = 0, y = 0;
+  if (patch.length > 0) {
+    const last = patch[patch.length - 1];
+    x = (last.x || 0) + gridW;  // place to the right
+    y =  last.y || 0;           // same vertical level
+  }
+
+  // Add the fixture with its X/Y
+  patch.push({
+    fixtureType: type,
+    universe:     uni,
+    address:      addr,
+    x, y
+  });
+
+  savePatch();       // persist to server + disk
   renderPatchTable();
   rerenderFixtures();
 }
