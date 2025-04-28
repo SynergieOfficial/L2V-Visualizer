@@ -156,17 +156,19 @@ function loadPatch() {
   fetch('/patch/patch.json')
     .then(res => res.json())
     .then(data => {
-      // Ensure every entry has x,y (default to 0,0)
-      patch = data.map(p => ({
-        ...p,
-        x: typeof p.x === 'number' ? p.x : 0,
-        y: typeof p.y === 'number' ? p.y : 0
-      }));
+      let migrated = false;
+      patch = data.map(p => {
+        const np = { ...p };
+        if (typeof np.x !== 'number') { np.x = 0; migrated = true; }
+        if (typeof np.y !== 'number') { np.y = 0; migrated = true; }
+        return np;
+      });
       renderPatchTable();
       rerenderFixtures();
-      
-      // Optionally persist defaults back
-      // savePatch();
+      if (migrated) {
+        savePatch(); // persist defaults back to the server
+        console.log('[Client] Migrated missing x,y → patch.json updated');
+      }
     })
     .catch(err => console.error('[Client] Failed to load patch:', err));
 }
