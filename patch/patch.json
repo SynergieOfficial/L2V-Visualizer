@@ -13,5 +13,10 @@
     "fixtureType": "TestSquare",
     "universe": 1,
     "address": 201
+  },
+  {
+    "fixtureType": "TestSquare",
+    "universe": 2,
+    "address": 21
   }
 ]

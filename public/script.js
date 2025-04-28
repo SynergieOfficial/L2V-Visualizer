@@ -57,6 +57,7 @@ function applySettings() {
   };
 }
 
+
 function fetchFixtureTypes() {
   fetch('/fixtures')
     .then(res => res.json())
@@ -204,9 +205,11 @@ function removeFixture(index) {
 function rerenderFixtures() {
   const container = document.getElementById('fixture-container');
   container.innerHTML = '';
+
   patch.forEach(({ fixtureType, universe, address }) => {
     loadFixture(fixtureType, address, universe);
   });
+
 }
 
 function savePatchToDisk() {
@@ -221,27 +224,36 @@ function updateStatus(connected) {
   status.innerHTML = connected ? 'Status: 🟢 Connected' : 'Status: 🔴 Waiting';
 }
 
-function loadFixture(type, address) {
+/**
+ * type: string
+ * address: number
+ * universe: number
+ */
+function loadFixture(type, address, universe) {
   Promise.all([
-    fetch(`/fixtures/${type}/template.html`).then(res => res.text()),
-    fetch(`/fixtures/${type}/style.css`).then(res => res.text()),
-    fetch(`/fixtures/${type}/config.json`).then(res => res.json())
-  ]).then(([html, css, config]) => {
+    fetch(`/fixtures/${type}/template.html`).then(r => r.text()),
+    fetch(`/fixtures/${type}/style.css`).then(r => r.text()),
+    fetch(`/fixtures/${type}/config.json`).then(r => r.json())
+  ])
+  .then(([html, css, config]) => {
     const container = document.getElementById('fixture-container');
-    const wrapper = document.createElement('div');
+    const wrapper   = document.createElement('div');
+    // include universe in the element ID
     wrapper.id = `fixture-${universe}-${address}`;
-    wrapper.dataset.address = address;
-    wrapper.dataset.universe = universe;
+    wrapper.dataset.address     = address;
+    wrapper.dataset.universe    = universe;
     wrapper.dataset.fixtureType = type;
-    wrapper.dataset.config = JSON.stringify(config);
+    wrapper.dataset.config      = JSON.stringify(config);
     wrapper.innerHTML = html;
     container.appendChild(wrapper);
 
-    const style = document.createElement('style');
-    style.innerHTML = css;
-    document.head.appendChild(style);
-  }).catch(err => console.error(`[Client] Failed loading fixture ${type}:`, err));
+    const styleTag = document.createElement('style');
+    styleTag.innerHTML = css;
+    document.head.appendChild(styleTag);
+  })
+  .catch(err => console.error(`[Client] Failed loading fixture ${type}:`, err));
 }
+
 
 function processDMXUpdate({ universe, fixtures }) {
   fixtures.forEach(({ id, dmx }) => {
