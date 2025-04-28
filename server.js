@@ -59,16 +59,19 @@ wss.on('connection', ws => {
 
     if (msg.type === 'connect') {
       nic = msg.nic;
-      universe = parseInt(msg.universe, 10);
-      console.log(`[sACN] Client connected → NIC=${nic}, universe=${universe}`);
-      loadPatch();        // now gives outputFixtures = [{address, universe},…]
-setupReceivers();
+      console.log(`[sACN] Client connected → NIC=${nic}`);
+      loadPatch();
+      setupReceivers();
       ws.send(JSON.stringify({ type: 'status', connected: true }));
+    }
 
-    } else if (msg.type === 'save') {
+    else if (msg.type === 'save') {
       fs.writeFileSync(patchFile, JSON.stringify(msg.patch, null, 2));
       console.log('[sACN] patch/patch.json saved');
-      outputFixtures = msg.patch.map(p => ({ address: p.address }));
+      outputFixtures = msg.patch.map(p => ({
+        universe: p.universe,
+        address: p.address
+      }));
     }
   });
 });
@@ -129,13 +132,20 @@ function setupReceivers() {
     });
     sock.on('message', packet => {
       const dmx = parseSacn(packet);
-      // only send the fixtures in this universe
       const fixtures = outputFixtures
-        .filter(f=>f.universe===u)
-        .map(f=>({ id:`fixture-${f.universe}-${f.address}`, dmx }));
+        .filter(f => f.universe === u)
+        .map(f => ({
+          id: `fixture-${f.universe}-${f.address}`,
+          dmx
+        }));
+    
       wss.clients.forEach(c => {
-        if (c.readyState===WebSocket.OPEN) {
-          c.send(JSON.stringify({ universe:u, fixtures }));
+        if (c.readyState === WebSocket.OPEN) {
+          c.send(JSON.stringify({
+            type: 'update',      // ← new
+            universe: u,
+            fixtures
+          }));
         }
       });
     });
@@ -146,12 +156,8 @@ function setupReceivers() {
 /** Simple sACN parser: use last 512 bytes */
 function parseSacn(packet) {
   if (packet.length < 512) return [];
-  const sliceStart = packet.length - 512;
-  const dmx = Array.from(packet.slice(sliceStart, sliceStart + 512));
-  return outputFixtures.map(({ address }) => ({
-    id: `fixture-${address}`,
-    dmx
-  }));
+  const start = packet.length - 512;
+  return Array.from(packet.slice(start, start + 512));
 }
 
 server.listen(PORT, () => {
