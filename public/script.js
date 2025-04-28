@@ -109,19 +109,19 @@ function renderPatchTable() {
   patch.forEach(({ fixtureType, address }, i) => {
     const tr = document.createElement('tr');
 
-    // Fixture type
+    // Fixture Type
     const tdType = document.createElement('td');
     tdType.textContent = fixtureType;
     tr.appendChild(tdType);
 
-    // Start address (click→edit)
+    // Start Address (click to edit)
     const tdAddr = document.createElement('td');
     tdAddr.textContent = address;
     tdAddr.classList.add('editable-address');
     tdAddr.dataset.index = i;
     tr.appendChild(tdAddr);
 
-    // Action (remove)
+    // Action: Remove button
     const tdAction = document.createElement('td');
     const btn = document.createElement('button');
     btn.textContent = '🗑';
@@ -132,6 +132,23 @@ function renderPatchTable() {
     tr.appendChild(tdAction);
 
     tbody.appendChild(tr);
+  });
+}
+
+function removeFixture(index) {
+  patch.splice(index, 1);
+  if (ws && ws.readyState === WebSocket.OPEN) {
+    ws.send(JSON.stringify({ type: 'save', patch }));
+  }
+  renderPatchTable();
+  rerenderFixtures();
+}
+
+function rerenderFixtures() {
+  const container = document.getElementById('fixture-container');
+  container.innerHTML = '';
+  patch.forEach(({ fixtureType, address }) => {
+    loadFixture(fixtureType, address);
   });
 }
 
@@ -249,40 +266,26 @@ document.getElementById('patch-list-body')
     const td = e.target;
     if (!td.classList.contains('editable-address')) return;
 
-    const i = parseInt(td.dataset.index, 10);
+    const i = +td.dataset.index;
     const current = patch[i].address;
-    td.innerHTML = `<input type="number" min="1" value="${current}" data-index="${i}" />`;
-
+    td.innerHTML = `<input type="number" min="1" value="${current}" data-index="${i}">`;
     const input = td.querySelector('input');
     input.focus();
 
-    // Commit on blur or Enter
-    input.addEventListener('blur', commitAddressEdit);
+    function commit() {
+      const newAddr = parseInt(input.value, 10);
+      if (newAddr > 0) {
+        patch[i].address = newAddr;
+        if (ws && ws.readyState === WebSocket.OPEN) {
+          ws.send(JSON.stringify({ type: 'save', patch }));
+        }
+      }
+      renderPatchTable();
+      rerenderFixtures();
+    }
+
+    input.addEventListener('blur', commit);
     input.addEventListener('keydown', ev => {
       if (ev.key === 'Enter') input.blur();
     });
   });
-
-function commitAddressEdit(e) {
-  const input = e.target;
-  const i = parseInt(input.dataset.index, 10);
-  const newAddr = parseInt(input.value, 10);
-
-  if (!isNaN(newAddr) && newAddr > 0) {
-    patch[i].address = newAddr;
-    // Save & rerender
-    if (ws && ws.readyState === WebSocket.OPEN) {
-      ws.send(JSON.stringify({ type: 'save', patch }));
-    }
-  }
-  renderPatchTable();
-  rerenderFixtures();
-}
-
-function rerenderFixtures() {
-  const container = document.getElementById('fixture-container');
-  container.innerHTML = '';
-  patch.forEach(({ fixtureType, address }) => {
-    loadFixture(fixtureType, address);
-  });
-}
