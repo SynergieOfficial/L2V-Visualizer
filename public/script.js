@@ -5,6 +5,8 @@ let sacnConnected = false;
 
 const fixtureConfigs = {};
 
+console.log('[Client] script.js loaded');
+
 window.onload = () => {
   setupSettingsMenu();
   fetchNICs();
@@ -49,6 +51,7 @@ function setupSettingsMenu() {
 
 function applySettings() {
   const nic = document.getElementById('nic').value;
+  console.log('[Client] applySettings() called; NIC =', nic);
 
   // — if there’s already an open WS, just tell it to switch NIC
   if (ws && ws.readyState === WebSocket.OPEN) {
@@ -72,7 +75,9 @@ function applySettings() {
   };
 
   ws.onmessage = (event) => {
+    console.log('[Client] ws.onmessage raw payload →', event.data);
     const data = JSON.parse(event.data);
+    console.log('[Client] ws.onmessage parsed →', data);
 
     if (data.type === 'status') {
       updateStatus(data.connected);
@@ -82,6 +87,7 @@ function applySettings() {
       updateStatus(true);
       clearTimeout(disconnectTimer);
       disconnectTimer = setTimeout(() => updateStatus(false), DISCONNECT_TIMEOUT);
+      console.log('[Client] calling processDMXUpdate for universe', data.universe, 'with', data.fixtures.length, 'fixtures');
       processDMXUpdate(data);
 
     } else if (data.type === 'pong') {
@@ -301,6 +307,8 @@ function loadFixture(type, address, universe) {
 
 
 function processDMXUpdate({ universe, fixtures }) {
+    console.log('[Client] processDMXUpdate() start → universe:', universe, ', fixtures:', fixtures);
+  
   fixtures.forEach(({ id, dmx }) => {
     const wrapper = document.getElementById(id);
     if (!wrapper) return;
@@ -334,6 +342,7 @@ function processDMXUpdate({ universe, fixtures }) {
       });
     });
   });
+  console.log('[Client] processDMXUpdate() done');
 }
 
 function applyRGB(el, channels) {

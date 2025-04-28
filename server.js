@@ -55,8 +55,15 @@ app.get('/fixtures', (req, res) => {
 /** WebSocket: connect & save */
 wss.on('connection', ws => {
   ws.on('message', raw => {
-    const msg = JSON.parse(raw);
-
+    let msg;
+        try {
+          msg = JSON.parse(raw);
+        } catch (err) {
+          console.error('[sACN] Invalid JSON from WS client →', raw);
+          return;
+        }
+        console.log('[sACN] WS message received → type:', msg.type, ', payload:', msg);
+    
     if (msg.type === 'connect') {
       nic = msg.nic;
       console.log(`[sACN] Client connected → NIC=${nic}`);
@@ -68,6 +75,7 @@ wss.on('connection', ws => {
     else if (msg.type === 'save') {
       fs.writeFileSync(patchFile, JSON.stringify(msg.patch, null, 2));
       console.log('[sACN] patch/patch.json saved');
+      console.log(`[sACN] outputFixtures now has ${msg.patch.length} entries`);
       outputFixtures = msg.patch.map(p => ({
         universe: p.universe,
         address: p.address
@@ -134,7 +142,9 @@ function setupReceivers() {
       console.log(`[sACN] Joined universe ${u} → ${mcast}`);
     });
     sock.on('message', packet => {
+      console.log(`[sACN] UDP packet received on universe ${u} → length ${packet.length}`);
       const dmx = parseSacn(packet);
+      console.log(`[sACN] Parsed DMX frame of ${dmx.length} channels for universe ${u}`);
       // build per-fixture updates for this universe…
       const fixtures = outputFixtures
         .filter(f => f.universe === u)
@@ -149,6 +159,7 @@ function setupReceivers() {
         universe: u,
         fixtures
       });
+      console.log('[sACN] Broadcasting update →', payload);
     
       wss.clients.forEach(c => {
         if (c.readyState === WebSocket.OPEN) {
