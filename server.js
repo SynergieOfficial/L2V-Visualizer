@@ -76,11 +76,38 @@ setupReceivers();
 /** Load patch into memory */
 function loadPatch() {
   try {
-    const patch = JSON.parse(fs.readFileSync(patchFile));
-    outputFixtures = patch.map(p => ({ address: p.address }));
-    console.log(`[sACN] Loaded ${outputFixtures.length} fixtures from patch/patch.json`);
-  } catch {
-    console.log('[sACN] No valid patch/patch.json found; starting with zero fixtures');
+    // Read existing patch data
+    let patchData = JSON.parse(fs.readFileSync(patchFile, 'utf-8'));
+
+    // Back-fill missing universe → 1
+    let migrated = false;
+    patchData = patchData.map(entry => {
+      if (entry.universe === undefined) {
+        migrated = true;
+        return { ...entry, universe: 1 };
+      }
+      return entry;
+    });
+
+    // If we added universe fields, overwrite on disk
+    if (migrated) {
+      fs.writeFileSync(patchFile, JSON.stringify(patchData, null, 2), 'utf-8');
+      console.log('[sACN] Migrated patch.json entries to include universe=1');
+    }
+
+    // Populate in-memory fixtures
+    outputFixtures = patchData.map(p => ({
+      universe: p.universe,
+      address: p.address
+    }));
+    console.log(
+      `[sACN] Loaded ${outputFixtures.length} fixtures from patch/patch.json`
+    );
+
+  } catch (err) {
+    console.log(
+      '[sACN] No valid patch/patch.json found or parse error; starting with zero fixtures'
+    );
     outputFixtures = [];
   }
 }
