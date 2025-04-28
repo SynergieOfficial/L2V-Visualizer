@@ -5,7 +5,7 @@ let sacnConnected = false;
 
 const fixtureConfigs = {};
 
-console.log('[Client] script.js loaded');
+//console.log('[Client] script.js loaded');
 
 window.onload = () => {
   setupSettingsMenu();
@@ -71,9 +71,9 @@ function applySettings() {
   };
 
   ws.onmessage = (event) => {
-    console.log('[Client] ws.onmessage raw payload →', event.data);
+    //console.log('[Client] ws.onmessage raw payload →', event.data);
     const data = JSON.parse(event.data);
-    console.log('[Client] ws.onmessage parsed →', data);
+    //console.log('[Client] ws.onmessage parsed →', data);
 
     if (data.type === 'status') {
       // server connection ack
@@ -84,7 +84,7 @@ function applySettings() {
       updateStatus(true);
       clearTimeout(disconnectTimer);
       disconnectTimer = setTimeout(() => updateStatus(false), DISCONNECT_TIMEOUT);
-      console.log('[Client] calling processDMXUpdate for universe', data.universe, 'with', data.fixtures.length, 'fixtures');
+      //console.log('[Client] calling processDMXUpdate for universe', data.universe, 'with', data.fixtures.length, 'fixtures');
       processDMXUpdate(data);
       }
   };
@@ -298,7 +298,7 @@ function loadFixture(type, address, universe) {
 
 
 function processDMXUpdate({ universe, fixtures }) {
-    console.log('[Client] processDMXUpdate() start → universe:', universe, ', fixtures:', fixtures);
+    //console.log('[Client] processDMXUpdate() start → universe:', universe, ', fixtures:', fixtures);
   
   fixtures.forEach(({ id, dmx }) => {
     const wrapper = document.getElementById(id);

@@ -67,7 +67,7 @@ wss.on('connection', ws => {
       console.error('[sACN] Invalid JSON from WS client →', raw);
       return;
     }
-    console.log('[sACN] WS message received → type:', msg.type, ', payload:', msg);
+    //console.log('[sACN] WS message received → type:', msg.type, ', payload:', msg);
 
     if (msg.type === 'connect') {
       nic = msg.nic;
@@ -123,9 +123,9 @@ function loadPatch() {
       universe: p.universe,
       address: p.address
     }));
-    console.log(
-      `[sACN] Loaded ${outputFixtures.length} fixtures from patch/patch.json`
-    );
+    //console.log(
+    //  `[sACN] Loaded ${outputFixtures.length} fixtures from patch/patch.json`
+    //);
 
   } catch (err) {
     console.log(
@@ -161,14 +161,14 @@ function setupReceivers() {
     });
 
     sock.on('message', packet => {
-      console.log(`[sACN] 📨 UDP packet on U${u} (len=${packet.length})`);
+      //console.log(`[sACN] 📨 UDP packet on U${u} (len=${packet.length})`);
       if (packet.length < 512) {
         console.warn(`[sACN] Dropping short packet (${packet.length} bytes) on U${u}`);
         return;
       }
 
       const dmx = parseSacn(packet);
-      console.log(`[sACN]   Parsed DMX frame (channels=${dmx.length}) for U${u}`);
+      //console.log(`[sACN]   Parsed DMX frame (channels=${dmx.length}) for U${u}`);
 
       const fixtures = outputFixtures
         .filter(f => f.universe === u)
@@ -178,9 +178,9 @@ function setupReceivers() {
         }));
 
       const payload = JSON.stringify({ type: 'update', universe: u, fixtures });
-      console.log(
-        `[sACN] ▶️ Broadcasting update to ${wss.clients.size} WS clients: U${u}, fixtures=${fixtures.length}`
-      );
+      //console.log(
+      //  `[sACN] ▶️ Broadcasting update to ${wss.clients.size} WS clients: U${u}, fixtures=${fixtures.length}`
+      //);
 
       wss.clients.forEach(c => {
         if (c.readyState === WebSocket.OPEN) {
