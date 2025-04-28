@@ -60,8 +60,8 @@ wss.on('connection', ws => {
     if (msg.type === 'connect') {
       nic = msg.nic;
       console.log(`[sACN] Client connected → NIC=${nic}`);
-      loadPatch();           // seeds outputFixtures with {universe, address}
-      setupReceivers();
+      loadPatch();        // loads outputFixtures = [{ universe, address }, …]
+      setupReceivers();   // now listens on all universes in outputFixtures
       ws.send(JSON.stringify({ type: 'status', connected: true }));
     }
 
@@ -132,6 +132,7 @@ function setupReceivers() {
     });
     sock.on('message', packet => {
       const dmx = parseSacn(packet);
+      // build per-fixture updates for this universe…
       const fixtures = outputFixtures
         .filter(f => f.universe === u)
         .map(f => ({
@@ -139,18 +140,18 @@ function setupReceivers() {
           dmx
         }));
     
-        wss.clients.forEach(c => {
-          if (c.readyState === WebSocket.OPEN) {
-            c.send(JSON.stringify({
-              type: 'update',
-              universe: u,
-              fixtures: fixtures.map(f => ({
-                id: f.id,
-                dmx: parseSacn(packet)
-              }))
-            }));
-          }
-        });
+      // broadcast with type:'update'
+      const payload = JSON.stringify({
+        type: 'update',
+        universe: u,
+        fixtures
+      });
+    
+      wss.clients.forEach(c => {
+        if (c.readyState === WebSocket.OPEN) {
+          c.send(payload);
+        }
+      });
     });
     sockets[u] = sock;
   });

@@ -17,17 +17,17 @@ window.onload = () => {
           .addEventListener('click', savePatchToDisk);
 };
 
-let lastPacketTimer = null;
 let disconnectTimer;
 const DISCONNECT_TIMEOUT = 5000;
 
-function setStatus(connected) {
+/**
+ * Update the sACN status indicator.
+ */
+function updateStatus(connected) {
   const el = document.getElementById('sacn-status');
-  if (connected) {
-    el.textContent = 'Status: 🟢 Connected';
-  } else {
-    el.textContent = 'Status: 🔴 Disconnected';
-  }
+  el.textContent = connected
+    ? 'Status: 🟢 Connected'
+    : 'Status: 🔴 Disconnected';
 }
 
 function setupSettingsMenu() {
@@ -61,8 +61,7 @@ function applySettings() {
       nic: nic
       // no global universe
     }));
-    // set status to waiting until first packet arrives
-    updateStatus(false);
+    updateStatus(false);     // now matches our renamed function
   };
 
   ws.onmessage = (event) => {
