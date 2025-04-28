@@ -53,8 +53,11 @@ app.get('/fixtures', (req, res) => {
 });
 
 /** WebSocket: connect & save */
-ws.on('message', raw => {
-      // ── parse & log every incoming WS frame
+// ── when a new browser connects, set up its message handler
+  wss.on('connection', ws => {
+    console.log('[sACN] WebSocket client connected');
+    ws.on('message', raw => {
+    // ── parse & log every incoming WS frame
       let msg;
       try {
         msg = JSON.parse(raw);
@@ -84,6 +87,8 @@ ws.on('message', raw => {
             ws.send(JSON.stringify({ type: 'pong' }));
     }
   });
+});
+
 
 /** Load patch into memory */
 function loadPatch() {
