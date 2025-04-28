@@ -5,14 +5,14 @@
     "address": 1
   },
   {
-    "fixtureType": "BOLT1C",
+    "fixtureType": "TestSquare",
     "universe": 1,
-    "address": 41
+    "address": 21
   },
   {
     "fixtureType": "TestSquare",
-    "universe": 1,
-    "address": 201
+    "universe": 2,
+    "address": 1
   },
   {
     "fixtureType": "TestSquare",

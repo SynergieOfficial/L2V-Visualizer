@@ -135,50 +135,63 @@ function loadPatch() {
   }
 }
 
-/** Start listening for sACN packets */
+/**
+ * Spawn one UDP socket per DMX universe in outputFixtures,
+ * join the multicast group, parse e1.31 frames, and broadcast
+ * updates over WebSockets.
+ */
 function setupReceivers() {
-  // close old sockets
-  Object.values(sockets).forEach(s=>s.close());
-  Object.keys(sockets).forEach(u=>delete sockets[u]);
+  // Which universes do we need to listen on?
+  const universes = [...new Set(outputFixtures.map(f => f.universe))];
+  console.log('[sACN] setupReceivers → monitoring universes:', universes);
 
-  // unique universes in current patch
-  const universes = [...new Set(outputFixtures.map(f=>f.universe))];
   universes.forEach(u => {
     const sock = dgram.createSocket('udp4');
-    sock.bind(SACN_PORT, () => {
-      const mcast = `239.255.${(u>>8)&0xff}.${u&0xff}`;
-      sock.addMembership(mcast, nic);
-      console.log(`[sACN] Joined universe ${u} → ${mcast}`);
+
+    // Log any socket errors
+    sock.on('error', err => {
+      console.error(`[sACN] UDP socket error on U${u}:`, err);
     });
+
+    // Bind & join multicast
+    sock.bind(SACN_PORT, () => {
+      const mcast = `239.255.${(u >> 8) & 0xff}.${u & 0xff}`;
+      sock.addMembership(mcast, nic);
+      console.log(`[sACN] Joined universe ${u} → ${mcast} on NIC ${nic}`);
+    });
+
+    // Handle each incoming DMX (sACN) packet
     sock.on('message', packet => {
-      // ── log every UDP sACN packet
-      console.log(`[sACN] UDP packet received on universe ${u} → length ${packet.length}`);
+      console.log(`[sACN] 📨 UDP packet on U${u} (len=${packet.length})`);
+
+      if (packet.length < 512) {
+        console.warn(`[sACN] Dropping short packet (${packet.length} bytes) on U${u}`);
+        return;
+      }
+
       const dmx = parseSacn(packet);
-      console.log(`[sACN] Parsed DMX frame of ${dmx.length} channels for universe ${u}`);
- 
-      // build per-fixture updates for this universe…
+      console.log(`[sACN]   Parsed DMX frame (channels=${dmx.length}) for U${u}`);
+
+      // Build the fixtures array for this universe
       const fixtures = outputFixtures
         .filter(f => f.universe === u)
         .map(f => ({
           id: `fixture-${f.universe}-${f.address}`,
           dmx
         }));
-    
-      // broadcast with type:'update'
-      const payload = JSON.stringify({
-        type: 'update',
-        universe: u,
-        fixtures
-      });
-      console.log('[sACN] Broadcasting update →', payload);
-    
+
+      // Broadcast to all connected WS clients
+      const payload = JSON.stringify({ type: 'update', universe: u, fixtures });
+      console.log(
+        `[sACN] ▶️ Broadcasting update to ${wss.clients.size} WS clients: U${u}, fixtures=${fixtures.length}`
+      );
+
       wss.clients.forEach(c => {
         if (c.readyState === WebSocket.OPEN) {
           c.send(payload);
         }
       });
     });
-    sockets[u] = sock;
   });
 }
 
