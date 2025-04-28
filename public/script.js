@@ -8,6 +8,7 @@ let disconnectTimer;
 let layoutEditMode = JSON.parse(localStorage.getItem('layoutEditMode') || 'false');
 let gridWidth      = parseInt(localStorage.getItem('gridWidth')  || '50', 10);
 let gridHeight     = parseInt(localStorage.getItem('gridHeight') || '50', 10);
+let dragState = null;
 
 const fixtureConfigs = {};
 const DISCONNECT_TIMEOUT = 5000;
@@ -591,4 +592,74 @@ gridHeightInput.addEventListener('input', () => {
   gridHeight = parseInt(gridHeightInput.value, 10) || gridHeight;
   localStorage.setItem('gridHeight', gridHeight);
   drawGrid();
+});
+
+// On mousedown inside the fixture container...
+fixtureContainer.addEventListener('mousedown', e => {
+  if (!layoutEditMode) return;
+  const wrapper = e.target.closest('div[data-fixture-type]');
+  if (!wrapper) return;
+
+  e.preventDefault();
+  const containerRect = fixtureContainer.getBoundingClientRect();
+  const rect = wrapper.getBoundingClientRect();
+
+  dragState = {
+    wrapper,
+    // mouse start coords
+    startX: e.clientX,
+    startY: e.clientY,
+    // original left/top relative to container
+    origLeft: rect.left - containerRect.left,
+    origTop: rect.top  - containerRect.top
+  };
+
+  document.body.style.cursor = 'move';
+});
+
+// On mousemove: reposition the dragged wrapper
+document.addEventListener('mousemove', e => {
+  if (!dragState) return;
+
+  const { wrapper, origLeft, origTop, startX, startY } = dragState;
+  const dx = e.clientX - startX;
+  const dy = e.clientY - startY;
+
+  const rawX = origLeft + dx;
+  const rawY = origTop  + dy;
+
+  wrapper.style.left = `${rawX}px`;
+  wrapper.style.top  = `${rawY}px`;
+});
+
+// On mouseup: snap to grid, persist, and clear state
+document.addEventListener('mouseup', e => {
+  if (!dragState) return;
+
+  const { wrapper, origLeft, origTop, startX, startY } = dragState;
+  const dx = e.clientX - startX;
+  const dy = e.clientY - startY;
+  const rawX = origLeft + dx;
+  const rawY = origTop  + dy;
+
+  // Snap by rounding to nearest grid interval
+  const snappedX = Math.round(rawX / gridWidth ) * gridWidth;
+  const snappedY = Math.round(rawY / gridHeight) * gridHeight;
+
+  wrapper.style.left = `${snappedX}px`;
+  wrapper.style.top  = `${snappedY}px`;
+
+  // Persist into patch[] and save
+  const uni = parseInt(wrapper.dataset.universe, 10);
+  const addr = parseInt(wrapper.dataset.address, 10);
+  const idx = patch.findIndex(f => f.universe === uni && f.address === addr);
+  if (idx !== -1) {
+    patch[idx].x = snappedX;
+    patch[idx].y = snappedY;
+    savePatch();
+  }
+
+  // Cleanup
+  dragState = null;
+  document.body.style.cursor = '';
 });
