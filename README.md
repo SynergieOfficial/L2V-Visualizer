@@ -109,11 +109,18 @@ A web-based lighting visualizer for festival-grade DMX rigs. Mirror real sACN DM
 
 ---
 
-## Roadmap (v0.6+)
+## Roadmap
 
-- Spatial layout: assign X/Y positions and group fixtures on a virtual grid
-- Art‑Net support: ingest and parse Art‑Net alongside sACN
-- Advanced frost: directional blur or beam-specific glow per `config.json`
+- **v0.6 – Layouting**: Introduce an interactive, snapping grid system:
+  - Edit Mode toggle in Settings to show/hide the grid overlay
+  - Click-and-drag fixtures to X/Y grid positions with snap-to-grid behavior
+  - Controls in Settings for horizontal and vertical grid spacing (grid cell width/height)
+  - Persist fixture positions in patch data
+
+- **v0.7 – Extensions**:
+  - Art‑Net support: ingest and parse Art‑Net alongside sACN
+  - Advanced frost: directional blur or beam-specific glow per `config.json`
+  - Performance improvements and miscellaneous UX tweaks
 
 ---
 
