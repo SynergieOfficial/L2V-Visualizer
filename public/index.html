@@ -14,6 +14,22 @@
     <select id="nic"></select>
     <button onclick="applySettings()">Apply</button>
     <div id="sacn-status">Status: 🔴 Waiting</div>
+    <div class="setting">
+      <label>
+        <input type="checkbox" id="layout-edit-toggle">
+        Enable Layout Edit Mode
+      </label>
+    </div>
+    <div class="setting">
+      <label>
+        Grid Width:
+        <input type="number" id="grid-width-input" min="10" value="50"> px
+      </label>
+      <label>
+        Grid Height:
+        <input type="number" id="grid-height-input" min="10" value="50"> px
+      </label>
+    </div>
     <h3>Add Fixture</h3>
     <div id="add-fixture-controls">
       <select id="fixture-type-select">

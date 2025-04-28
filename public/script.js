@@ -4,8 +4,20 @@ let fixtureTypes = [];
 let sacnConnected = false;
 let pencilMode = false;
 let pencilIdx  = null;
+let disconnectTimer;
+let layoutEditMode = JSON.parse(localStorage.getItem('layoutEditMode') || 'false');
+let gridWidth      = parseInt(localStorage.getItem('gridWidth')  || '50', 10);
+let gridHeight     = parseInt(localStorage.getItem('gridHeight') || '50', 10);
 
 const fixtureConfigs = {};
+const DISCONNECT_TIMEOUT = 5000;
+const layoutToggle    = document.getElementById('layout-edit-toggle');
+const gridWidthInput  = document.getElementById('grid-width-input');
+const gridHeightInput = document.getElementById('grid-height-input');
+const fixtureContainer = document.getElementById('fixture-container');
+const gridCanvas = document.createElement('canvas');
+gridCanvas.id = 'grid-overlay';
+
 
 //console.log('[Client] script.js loaded');
 
@@ -21,8 +33,19 @@ window.onload = () => {
           .addEventListener('click', savePatchToDisk);
 };
 
-let disconnectTimer;
-const DISCONNECT_TIMEOUT = 5000;
+layoutToggle.checked    = layoutEditMode;
+gridWidthInput.value    = gridWidth;
+gridHeightInput.value   = gridHeight;
+fixtureContainer.style.position = 'relative';  // ensure positioning context
+
+Object.assign(gridCanvas.style, {
+  position: 'absolute',
+  top: '0', left: '0',
+  width: '100%', height: '100%',
+  zIndex: 0,
+  display: layoutEditMode ? 'block' : 'none'
+});
+fixtureContainer.prepend(gridCanvas);
 
 /**
  * Update the sACN status indicator.
@@ -509,3 +532,63 @@ function conflictsWithExisting({ universe, address, footprint }, ignoreIndex) {
       ws.send(JSON.stringify({ type:'save', patch }));
     }
   }
+
+  // Resize & draw helpers
+function resizeCanvas() {
+  // Use actual pixel size
+  gridCanvas.width  = fixtureContainer.clientWidth;
+  gridCanvas.height = fixtureContainer.clientHeight;
+}
+function drawGrid() {
+  const ctx = gridCanvas.getContext('2d');
+  ctx.clearRect(0, 0, gridCanvas.width, gridCanvas.height);
+  ctx.strokeStyle = '#ccc';
+  ctx.lineWidth   = 1;
+
+  // vertical lines
+  for (let x = 0; x <= gridCanvas.width; x += gridWidth) {
+    ctx.beginPath();
+    ctx.moveTo(x + 0.5, 0);
+    ctx.lineTo(x + 0.5, gridCanvas.height);
+    ctx.stroke();
+  }
+  // horizontal lines
+  for (let y = 0; y <= gridCanvas.height; y += gridHeight) {
+    ctx.beginPath();
+    ctx.moveTo(0, y + 0.5);
+    ctx.lineTo(gridCanvas.width, y + 0.5);
+    ctx.stroke();
+  }
+}
+function updateGridVisibility() {
+  gridCanvas.style.display = layoutEditMode ? 'block' : 'none';
+}
+
+// Initial draw + handle window resizes
+resizeCanvas();
+drawGrid();
+window.addEventListener('resize', () => {
+  resizeCanvas();
+  drawGrid();
+});
+
+// Toggle Layout Mode
+layoutToggle.addEventListener('change', () => {
+  layoutEditMode = layoutToggle.checked;
+  localStorage.setItem('layoutEditMode', JSON.stringify(layoutEditMode));
+  updateGridVisibility();
+});
+
+// Change Grid Width
+gridWidthInput.addEventListener('input', () => {
+  gridWidth = parseInt(gridWidthInput.value, 10) || gridWidth;
+  localStorage.setItem('gridWidth', gridWidth);
+  drawGrid();
+});
+
+// Change Grid Height
+gridHeightInput.addEventListener('input', () => {
+  gridHeight = parseInt(gridHeightInput.value, 10) || gridHeight;
+  localStorage.setItem('gridHeight', gridHeight);
+  drawGrid();
+});
