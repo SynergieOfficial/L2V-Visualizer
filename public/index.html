@@ -17,26 +17,31 @@
     <button onclick="applySettings()">Apply</button>
     <div id="sacn-status">Status: 🔴 Waiting</div>
     <h3>Add Fixture</h3>
-    <div id="add-fixture-controls">
-      <select id="fixture-type-select"></select>
-      <input id="fixture-address-input" type="number" min="1" placeholder="Start Address">
-      <button id="add-fixture-btn">Add Fixture</button>
-    </div>
+  <div id="add-fixture-controls">
+    <select id="fixture-type-select">
+      <option value="BOLT1C">BOLT1C</option>
+      <option value="TestSquare">TestSquare</option>
+    </select>
+    <input id="fixture-universe-input" type="number" min="1" value="1"
+           placeholder="Universe" style="width:5ch">
+    <input id="fixture-address-input" type="number" min="1"
+           placeholder="Start Address" style="width:6ch">
+    <button id="add-fixture-btn">Add Fixture</button>
+  </div>
 
-    <h3>Current Patch</h3>
-    <button id="save-patch-btn" style="margin-top: 15px;">Save Patch to Disk</button>
-    <table id="patch-list">
-      <thead>
-        <tr>
-          <th>Fixture Type</th>
-          <th>Start Address</th>
-          <th>Action</th>
-        </tr>
-      </thead>
-      <tbody id="patch-list-body">
-        <!-- Fixtures filled dynamically -->
-      </tbody>
-    </table>
+  <h3>Current Patch</h3>
+  <button id="save-patch-btn">Save Patch to Disk</button>
+  <table id="patch-list">
+    <thead>
+      <tr>
+        <th>Type</th>
+        <th>Universe</th>
+        <th>Start Address</th>
+        <th>Action</th>
+      </tr>
+    </thead>
+    <tbody id="patch-list-body"></tbody>
+  </table>
   </div>
   <div id="fixture-container"></div>
   <script src="script.js"></script>

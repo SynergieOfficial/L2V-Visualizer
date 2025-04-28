@@ -1,20 +1,18 @@
 let ws;
-let patch = [];
+let patch = []; // each item: { fixtureType, address, universe }
 let fixtureTypes = [];
 let sacnConnected = false;
 
 window.onload = () => {
   setupSettingsMenu();
+  fetchNICs();
   fetchFixtureTypes();
   loadPatch();
-  fetchNICs();   // ← populate the NIC dropdown
+
   document.getElementById('add-fixture-btn')
           .addEventListener('click', addFixture);
   document.getElementById('save-patch-btn')
           .addEventListener('click', savePatchToDisk);
-
-  document.getElementById('add-fixture-btn').addEventListener('click', addFixture);
-  document.getElementById('save-patch-btn').addEventListener('click', savePatchToDisk);
 };
 
 function setupSettingsMenu() {
@@ -79,60 +77,107 @@ function loadPatch() {
     .then(data => {
       patch = data;
       renderPatchTable();
-      patch.forEach(({ fixtureType, address }) => {
-        loadFixture(fixtureType, address);
-      });
+      rerenderFixtures();
     })
-    .catch(err => console.error('[Client] Failed to load patch.json:', err));
+    .catch(err => console.error('[Client] Failed to load patch:', err));
 }
 
 function addFixture() {
   const type    = document.getElementById('fixture-type-select').value;
-  const address = parseInt(document.getElementById('fixture-address-input').value);
-  if (!type || isNaN(address)) return;
+  const uni     = parseInt(document.getElementById('fixture-universe-input').value, 10);
+  const addr    = parseInt(document.getElementById('fixture-address-input').value, 10);
+  if (!type || isNaN(uni) || isNaN(addr)) return alert('Type, universe & address required');
 
-  // 1) update client patch
-  patch.push({ fixtureType: type, address });
-  renderPatchTable();
-  loadFixture(type, address);
-
-  // 2) immediately tell the server about this new fixture
-  if (ws && ws.readyState === WebSocket.OPEN) {
-    ws.send(JSON.stringify({ type: 'save', patch }));
+  // overlap check
+  if (conflictsWithExisting({ universe:uni, address:addr, footprint:getFootprint(type) })) {
+    return alert('DMX address conflict in universe '+uni);
   }
+
+  patch.push({ fixtureType:type, universe:uni, address:addr });
+  savePatch();        // tells server and writes to disk
+  renderPatchTable();
+  rerenderFixtures();
 }
 
 function renderPatchTable() {
   const tbody = document.getElementById('patch-list-body');
   tbody.innerHTML = '';
 
-  patch.forEach(({ fixtureType, address }, i) => {
+  patch.forEach((f, i) => {
     const tr = document.createElement('tr');
 
-    // Fixture Type
-    const tdType = document.createElement('td');
-    tdType.textContent = fixtureType;
-    tr.appendChild(tdType);
+    // Type
+    ['fixtureType','universe','address'].forEach(key => {
+      const td = document.createElement('td');
+      td.textContent = f[key];
+      td.classList.add(`editable-${key}`);
+      td.dataset.index = i;
+      tr.appendChild(td);
+    });
 
-    // Start Address (click to edit)
-    const tdAddr = document.createElement('td');
-    tdAddr.textContent = address;
-    tdAddr.classList.add('editable-address');
-    tdAddr.dataset.index = i;
-    tr.appendChild(tdAddr);
+    // Action
+    const tdAct = document.createElement('td');
+    const btnDel = document.createElement('button');
+    btnDel.textContent = '🗑';
+    btnDel.title       = 'Remove fixture';
+    btnDel.dataset.idx = i;
+    btnDel.addEventListener('click', () => {
+      patch.splice(i,1);
+      savePatch();
+      renderPatchTable();
+      rerenderFixtures();
+    });
+    tdAct.appendChild(btnDel);
 
-    // Action: Remove button
-    const tdAction = document.createElement('td');
-    const btn = document.createElement('button');
-    btn.textContent = '🗑';
-    btn.title = 'Remove fixture';
-    btn.dataset.index = i;
-    btn.addEventListener('click', () => removeFixture(i));
-    tdAction.appendChild(btn);
-    tr.appendChild(tdAction);
+    const btnEdit = document.createElement('button');
+    btnEdit.textContent = '✏️';
+    btnEdit.title       = 'Edit address/universe';
+    btnEdit.dataset.idx = i;
+    tdAct.appendChild(btnEdit);
 
+    tr.appendChild(tdAct);
     tbody.appendChild(tr);
   });
+}
+
+document.getElementById('patch-list-body')
+  .addEventListener('click', e => {
+    const td = e.target.closest('td');
+    if (!td) return;
+    const idx = +td.dataset.index;
+    // only edit universe or address cells
+    if (td.classList.contains('editable-universe') ||
+        td.classList.contains('editable-address')) {
+      const field = td.classList.contains('editable-universe') ? 'universe' : 'address';
+      const cur   = patch[idx][field];
+      td.innerHTML = `<input type="number" min="1" value="${cur}" data-field="${field}" data-index="${idx}">`;
+      const inp = td.querySelector('input');
+      inp.focus();
+
+      const commit = () => {
+        const val = parseInt(inp.value,10);
+        if (isNaN(val) || val < 1) return reloadTable();
+        // conflict check on address change
+        if (field==='address' && conflictsWithExisting({
+              universe: patch[idx].universe,
+              address: val,
+              footprint: getFootprint(patch[idx].fixtureType)
+            })) {
+          alert('Address conflict'); return reloadTable();
+        }
+        patch[idx][field] = val;
+        savePatch();
+        renderPatchTable();
+        rerenderFixtures();
+      };
+
+      inp.addEventListener('blur', commit);
+      inp.addEventListener('keydown', ev => { if (ev.key==='Enter') inp.blur(); });
+    }
+  });
+
+function reloadTable() {
+  renderPatchTable();
 }
 
 function removeFixture(index) {
@@ -186,7 +231,7 @@ function loadFixture(type, address) {
 }
 
 function processDMXUpdate(fixtures) {
-  fixtures.forEach(({ id, dmx }) => {
+  fixtures.forEach(({ universe, id, dmx }) => {
     const wrapper = document.getElementById(id);
     if (!wrapper) return;
 
@@ -289,3 +334,24 @@ document.getElementById('patch-list-body')
       if (ev.key === 'Enter') input.blur();
     });
   });
+
+  function getFootprint(type) {
+    // read the config.json footprint for this type
+    const cfg = fixtureConfigs[type];
+    return cfg ? cfg.footprint : 0;
+  }
+  
+  function conflictsWithExisting({ universe, address, footprint }) {
+    return patch.some(f => {
+      if (f.universe !== universe) return false;
+      // overlap if ranges [address, address+footprint-1] intersect
+      return (address <= f.address + footprint - 1) &&
+             (f.address <= address + footprint - 1);
+    });
+  }
+  
+  function savePatch() {
+    if (ws && ws.readyState === WebSocket.OPEN) {
+      ws.send(JSON.stringify({ type:'save', patch }));
+    }
+  }

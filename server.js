@@ -5,6 +5,7 @@ const path      = require('path');
 const http      = require('http');
 const WebSocket = require('ws');
 const dgram     = require('dgram');
+const sockets = {}; // universe → dgram socket
 
 const app    = express();
 const server = http.createServer(app);
@@ -60,8 +61,8 @@ wss.on('connection', ws => {
       nic = msg.nic;
       universe = parseInt(msg.universe, 10);
       console.log(`[sACN] Client connected → NIC=${nic}, universe=${universe}`);
-      loadPatch();          // now reads patch/patch.json
-      setupReceiver();
+      loadPatch();        // now gives outputFixtures = [{address, universe},…]
+setupReceivers();
       ws.send(JSON.stringify({ type: 'status', connected: true }));
 
     } else if (msg.type === 'save') {
@@ -85,26 +86,33 @@ function loadPatch() {
 }
 
 /** Start listening for sACN packets */
-function setupReceiver() {
-  if (udpSocket) udpSocket.close();
-  udpSocket = dgram.createSocket('udp4');
+function setupReceivers() {
+  // close old sockets
+  Object.values(sockets).forEach(s=>s.close());
+  Object.keys(sockets).forEach(u=>delete sockets[u]);
 
-  udpSocket.bind(SACN_PORT, () => {
-    udpSocket.setBroadcast(true);
-    udpSocket.setMulticastTTL(128);
-    const multicast = `239.255.${(universe >> 8) & 0xff}.${universe & 0xff}`;
-    udpSocket.addMembership(multicast, nic);
-    console.log(`[sACN] Listening on ${nic}:${SACN_PORT} → multicast ${multicast}`);
-  });
-
-  udpSocket.on('message', packet => {
-    // removed per-packet log to avoid spam
-    const fixturesData = parseSacn(packet);
-    wss.clients.forEach(c => {
-      if (c.readyState === WebSocket.OPEN) {
-        c.send(JSON.stringify({ type: 'update', fixtures: fixturesData }));
-      }
+  // unique universes in current patch
+  const universes = [...new Set(outputFixtures.map(f=>f.universe))];
+  universes.forEach(u => {
+    const sock = dgram.createSocket('udp4');
+    sock.bind(SACN_PORT, () => {
+      const mcast = `239.255.${(u>>8)&0xff}.${u&0xff}`;
+      sock.addMembership(mcast, nic);
+      console.log(`[sACN] Joined universe ${u} → ${mcast}`);
     });
+    sock.on('message', packet => {
+      const dmx = parseSacn(packet);
+      // only send the fixtures in this universe
+      const fixtures = outputFixtures
+        .filter(f=>f.universe===u)
+        .map(f=>({ id:`fixture-${f.universe}-${f.address}`, dmx }));
+      wss.clients.forEach(c => {
+        if (c.readyState===WebSocket.OPEN) {
+          c.send(JSON.stringify({ universe:u, fixtures }));
+        }
+      });
+    });
+    sockets[u] = sock;
   });
 }
 
