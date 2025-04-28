@@ -221,10 +221,10 @@ document.getElementById('patch-list-body').addEventListener('click', e => {
   const field = isUni ? 'universe' : 'address';
   const cur   = patch[idx][field];
 
+  // swap in the input
   td.innerHTML = `
     <input
-      type="number"
-      min="1"
+      type="number" min="1"
       value="${cur}"
       data-field="${field}"
       data-index="${idx}"
@@ -237,19 +237,32 @@ document.getElementById('patch-list-body').addEventListener('click', e => {
   const commit = () => {
     const val = parseInt(inp.value, 10);
     if (isNaN(val) || val < 1) {
+      // invalid → revert
       renderPatchTable();
       rerenderFixtures();
       return;
     }
 
-    // ── Pencil mode: after universe, open address
+    // ── Always run conflict check on address edits
+    if (field === 'address') {
+      const footprint = getFootprint(patch[idx].fixtureType);
+      const uni       = patch[idx].universe;
+      if (conflictsWithExisting({ universe: uni, address: val, footprint }, idx)) {
+        alert('Address conflict');
+        renderPatchTable();
+        rerenderFixtures();
+        return;
+      }
+    }
+
+    // ── Pencil‐mode Universe step
     if (field === 'universe' && pencilMode && idx === pencilIdx) {
       patch[idx][field] = val;
       savePatch();
       renderPatchTable();
       rerenderFixtures();
 
-      // now edit address of same row
+      // now open Address of same row
       setTimeout(() => {
         const addrTd = document.querySelector(
           `#patch-list-body td.editable-address[data-index="${idx}"]`
@@ -259,37 +272,20 @@ document.getElementById('patch-list-body').addEventListener('click', e => {
       return;
     }
 
+    // ── Pencil‐mode Address step (after conflict check above)
     if (field === 'address' && pencilMode && idx === pencilIdx) {
-      // 1) conflict check
-      if (conflictsWithExisting(
-            {
-              universe: patch[idx].universe,
-              address: val,
-              footprint: getFootprint(patch[idx].fixtureType)
-            },
-            idx  // skip self
-          )
-      ) {
-        alert('Address conflict');
-        renderPatchTable();
-        rerenderFixtures();
-        // stay in pencil mode so you can choose another address
-        return;
-      }
-  
-      // 2) no conflict → commit
       patch[idx][field] = val;
       savePatch();
       renderPatchTable();
       rerenderFixtures();
-  
-      // 3) exit pencil mode
+
+      // exit pencil mode
       pencilMode = false;
       pencilIdx  = null;
       return;
     }
 
-    // ── Normal cell edit (no auto-advance)
+    // ── Direct‐click (or final) edit: just save
     patch[idx][field] = val;
     savePatch();
     renderPatchTable();
