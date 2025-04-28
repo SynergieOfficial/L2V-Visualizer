@@ -674,6 +674,3 @@ document.addEventListener('mouseup', e => {
   dragState = null;
   document.body.style.cursor = '';
 });
-
-if (gridWidthInput)  gridWidthInput.addEventListener('input', /*…*/);
-if (gridHeightInput) gridHeightInput.addEventListener('input', /*…*/);
