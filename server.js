@@ -9,7 +9,7 @@ const sockets = {}; // universe → dgram socket
 
 const app    = express();
 const server = http.createServer(app);
-const wss    = new WebSocket.Server({ server });
+const wss = new WebSocket.Server({ server });
 
 const PORT      = 3000;
 const SACN_PORT = 5568;
@@ -54,27 +54,30 @@ app.get('/fixtures', (req, res) => {
 
 /** WebSocket: connect & save */
 // ── when a new browser connects, set up its message handler
-  wss.on('connection', ws => {
-    console.log('[sACN] WebSocket client connected');
-    ws.on('message', raw => {
+wss.on('connection', ws => {
+  console.log('[sACN] WebSocket client connected');
+
+  // Handle every incoming WS frame from this client:
+  ws.on('message', raw => {
     // ── parse & log every incoming WS frame
-      let msg;
-      try {
-        msg = JSON.parse(raw);
-      } catch (err) {
-        console.error('[sACN] Invalid JSON from WS client →', raw);
-        return;
-      }
-      console.log('[sACN] WS message received → type:', msg.type, ', payload:', msg);    
+    let msg;
+    try {
+      msg = JSON.parse(raw);
+    } catch (err) {
+      console.error('[sACN] Invalid JSON from WS client →', raw);
+      return;
+    }
+    console.log('[sACN] WS message received → type:', msg.type, ', payload:', msg);
+
     if (msg.type === 'connect') {
       nic = msg.nic;
       console.log(`[sACN] Client connected → NIC=${nic}`);
-      loadPatch();        // loads outputFixtures = [{ universe, address }, …]
-      setupReceivers();   // now listens on all universes in outputFixtures
-      ws.send(JSON.stringify({ type: 'status', connected: true }));
-    }
 
-    else if (msg.type === 'save') {
+      loadPatch();     // populates outputFixtures
+      setupReceivers();// spawns one UDP socket per universe
+      ws.send(JSON.stringify({ type: 'status', connected: true }));
+
+    } else if (msg.type === 'save') {
       fs.writeFileSync(patchFile, JSON.stringify(msg.patch, null, 2));
       console.log('[sACN] patch/patch.json saved');
       console.log(`[sACN] outputFixtures now has ${msg.patch.length} entries`);
@@ -82,12 +85,15 @@ app.get('/fixtures', (req, res) => {
         universe: p.universe,
         address: p.address
       }));
+
     } else if (msg.type === 'ping') {
-            // reply so the client can reset its timeout
-            ws.send(JSON.stringify({ type: 'pong' }));
+      // heartbeat reply
+      ws.send(JSON.stringify({ type: 'pong' }));
+    } else {
+      console.warn('[sACN] WS got unknown msg.type →', msg.type);
     }
-  });
-});
+  }); // end ws.on('message')
+});   // end wss.on('connection')
 
 
 /** Load patch into memory */
