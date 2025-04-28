@@ -259,13 +259,31 @@ document.getElementById('patch-list-body').addEventListener('click', e => {
       return;
     }
 
-    // ── Pencil mode: after address, finish and exit pencil mode
     if (field === 'address' && pencilMode && idx === pencilIdx) {
+      // 1) conflict check
+      if (conflictsWithExisting(
+            {
+              universe: patch[idx].universe,
+              address: val,
+              footprint: getFootprint(patch[idx].fixtureType)
+            },
+            idx  // skip self
+          )
+      ) {
+        alert('Address conflict');
+        renderPatchTable();
+        rerenderFixtures();
+        // stay in pencil mode so you can choose another address
+        return;
+      }
+  
+      // 2) no conflict → commit
       patch[idx][field] = val;
       savePatch();
       renderPatchTable();
       rerenderFixtures();
-
+  
+      // 3) exit pencil mode
       pencilMode = false;
       pencilIdx  = null;
       return;
