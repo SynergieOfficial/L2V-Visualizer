@@ -82,6 +82,17 @@ A web-based lighting visualizer for festival-grade DMX rigs. Mirror real sACN DM
 
 ## 🏷️ Changelog
 
+| V0.1 | Simple NIC and Universe Settings. Background Color controlled by DMX. |
+| V0.2 | Settings Cog + Modal with Hide-on-Idle behavior. |
+| V0.3 | Fixture Type System: Dynamic Fixture Loading (HTML, CSS, Config). |
+| V0.3.1 | Modular folder structure for fixtures. |
+| V0.3.2 | BOLT1C fixture added with full plate and beam mapping. |
+| V0.4.1 | sACN Status Indicator added. |
+| V0.4.2 | Settings Persistence: NIC + Universe save and load. |
+| V0.4.3 | Refined Cog Auto-Hide Behavior. |
+| V0.5 | Start full Patch System (remove hardcoded fixtures). |
+| V0.5.8 | Dynamic Address-Based DMX Slicing. Real DMX patching finalized. TestSquare and BOLT1C fully live-controlled. |
+
 ### [0.5.11] – 2025-04-28
 
 **🚀 Features**
