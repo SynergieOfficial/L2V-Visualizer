@@ -5,16 +5,15 @@ const path      = require('path');
 const http      = require('http');
 const WebSocket = require('ws');
 const dgram     = require('dgram');
-const express = require('express');
-const http    = require('http');
 
+// DMX protocol abstraction:
 const BaseReceiver    = require('./lib/dmx-protocol/baseReceiver');
 const { SACNReceiver }   = require('./lib/dmx-protocol/sacnReceiver');
 const { ArtNetReceiver } = require('./lib/dmx-protocol/artnetReceiver');
 
 const app    = express();
 const server = http.createServer(app);
-const wss = new WebSocket.Server({ server });
+const wss    = new WebSocket.Server({ server });
 
 const PORT      = 3000;
 const SACN_PORT = 5568;

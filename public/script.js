@@ -85,19 +85,21 @@ function setupSettingsMenu() {
 }
 
 function applySettings() {
-  const nic = document.getElementById('nic').value;
+  const nicValue      = document.getElementById('nic').value;
   const protocolValue = document.getElementById('protocol-select').value;
+  // Update our in-memory vars *and* persist them
+  protocol = protocolValue;
   localStorage.setItem('protocol', protocol);
 
   console.log('[Client] applySettings() → NIC=', nicValue, 'Protocol=', protocol);
 
   // — if there’s already an open WS, just tell it to switch NIC
   if (ws && ws.readyState === WebSocket.OPEN) {
-    ws.send(JSON.stringify({
-      type: 'connect',
-      nic: nicValue,
-      protocol
-    }));
+        ws.send(JSON.stringify({
+            type: 'connect',
+            nic: nicValue,
+            protocol
+          }));
     return;
   }
 
@@ -130,9 +132,9 @@ function applySettings() {
       // server connection ack
       updateStatus(data.connected);
 
-    } else if (data.type === 'update') {
-      // mark alive + reset our 5s timeout
-      updateStatus(false);
+        } else if (data.type === 'update') {
+            // mark alive + reset our 5s timeout
+            updateStatus(true);
       clearTimeout(disconnectTimer);
       disconnectTimer = setTimeout(() => updateStatus(false), DISCONNECT_TIMEOUT);
       //console.log('[Client] calling processDMXUpdate for universe', data.universe, 'with', data.fixtures.length, 'fixtures');
