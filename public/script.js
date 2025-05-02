@@ -11,6 +11,7 @@ let gridHeight     = parseInt(localStorage.getItem('gridHeight') || '50', 10);
 let dragState = null;
 let migrationPending = false;
 let protocol = localStorage.getItem('protocol') || 'sACN';
+document.getElementById('protocol-select').value = protocol;
 
 const fixtureConfigs = {};
 const DISCONNECT_TIMEOUT = 5000;

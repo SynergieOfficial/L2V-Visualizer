@@ -24,7 +24,7 @@ let outputFixtures = [];
 let universe       = 1;
 let nic            = '127.0.0.1';
 let protocol       = 'sACN';      // ← new: "sACN" or "ArtNet"
-const sockets      = {};          // reuse your existing sockets map
+let receiver       = null;
 
 /** Static file serving */
 app.use(express.static('public'));
@@ -140,81 +140,44 @@ function loadPatch() {
   }
 }
 
-/** Start listening for sACN packets */
+/** Start listening for sACN/Artnet packets */
 function setupReceivers() {
-  // 1) tear down any old sockets
-  Object.values(sockets).forEach(s => s.close());
-  Object.keys(sockets).forEach(k => delete sockets[k]);
-
-  // 2) dispatch based on protocol
-  if (protocol === 'ArtNet') {
-    const ARTNET_PORT = 6454;
-    const sock = dgram.createSocket({ type: 'udp4', reuseAddr: true });
-
-    sock.on('error', err => {
-      console.error('[Art-Net] UDP socket error:', err);
-    });
-
-    sock.bind({ port: ARTNET_PORT, exclusive: false }, () => {
-      console.log(`[Art-Net] Listening on ${ARTNET_PORT} via NIC ${nic}`);
-    });
-
-    sock.on('message', packet => {
-      // check “Art-” header & OpDmx opcode
-      if (packet.readUInt16BE(0) !== 0x4174) return;
-      if (packet.readUInt16LE(8) !== 0x5000) return;
-
-      const universe = packet.readUInt16LE(14);
-      const length   = packet.readUInt16BE(16);
-      if (packet.length < 18 + length) return;
-
-      const dmx = Array.from(packet.slice(18, 18 + length));
-      const fixtures = outputFixtures
-        .filter(f => f.universe === universe)
-        .map(f => ({ id:`fixture-${f.universe}-${f.address}`, dmx }));
-
-      const payload = JSON.stringify({ type:'update', universe, fixtures });
-      wss.clients.forEach(c => {
-        if (c.readyState === WebSocket.OPEN) c.send(payload);
-      });
-    });
-
-    sockets.artnet = sock;
-
-  } else {
-    // old sACN behavior
-    const universes = [...new Set(outputFixtures.map(f => f.universe))];
-    console.log('[sACN] setupReceivers → monitoring universes:', universes);
-
-    universes.forEach(u => {
-      const sock = dgram.createSocket({ type:'udp4', reuseAddr:true });
-
-      sock.on('error', err => {
-        console.error(`[sACN] UDP socket error on U${u}:`, err);
-      });
-
-      sock.bind({ port: SACN_PORT, exclusive: false }, () => {
-        const mcast = `239.255.${(u >> 8)&0xff}.${u&0xff}`;
-        sock.addMembership(mcast, nic);
-        console.log(`[sACN] Joined U${u} → ${mcast} on NIC ${nic}`);
-      });
-
-      sock.on('message', packet => {
-        if (packet.length < 512) return;
-        const dmx = parseSacn(packet);
-        const fixtures = outputFixtures
-          .filter(f => f.universe === u)
-          .map(f => ({ id:`fixture-${f.universe}-${f.address}`, dmx }));
-
-        const payload = JSON.stringify({ type:'update', universe:u, fixtures });
-        wss.clients.forEach(c => {
-          if (c.readyState === WebSocket.OPEN) c.send(payload);
-        });
-      });
-
-      sockets[u] = sock;
-    });
+  // 1) Tear down any old receiver
+  if (receiver) {
+    receiver.stop();
+    receiver = null;
   }
+
+  // 2) Pick class based on protocol
+  const ReceiverClass = protocol === 'ArtNet'
+    ? ArtNetReceiver
+    : SACNReceiver;
+
+  // 3) Create and wire up
+  //    We pass { nic, universes } into SACNReceiver so it knows which multicast groups;
+  //    ArtNetReceiver will ignore the universes field.
+  receiver = new ReceiverClass({
+    nic,
+    universes: [...new Set(outputFixtures.map(f => f.universe))]
+  });
+
+  receiver.on('data', ({ universe, channels }) => {
+    // reuse your old broadcast logic:
+    const fixtures = outputFixtures
+      .filter(f => f.universe === universe)
+      .map(f => ({
+        id:  `fixture-${universe}-${f.address}`,
+        dmx: channels
+      }));
+
+    const payload = JSON.stringify({ type:'update', universe, fixtures });
+    wss.clients.forEach(c => {
+      if (c.readyState === WebSocket.OPEN) c.send(payload);
+    });
+  });
+
+  // 4) Start it listening
+  receiver.start();
 }
 
 /** Simple sACN parser: use last 512 bytes */
@@ -226,4 +189,11 @@ function parseSacn(packet) {
 
 server.listen(PORT, () => {
   console.log(`Server running on http://localhost:${PORT}`);
+});
+
+process.on('SIGINT', () => {
+  console.log('Shutting down DMX receiver…');
+  // previously you closed sockets; now:
+  if (receiver) receiver.stop();
+  process.exit();
 });
