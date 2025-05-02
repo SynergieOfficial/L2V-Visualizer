@@ -10,8 +10,11 @@
 <body>
   <div id="settings-icon">⚙️</div>
   <div id="settings-modal">
-    <label for="nic">Network Interface:</label>
-    <select id="nic"></select>
+    <label for="protocol-select">DMX Protocol:</label>
+  <select id="protocol-select">
+    <option value="sACN">sACN</option>
+    <option value="ArtNet">Art-Net</option>
+  </select>
     <button onclick="applySettings()">Apply</button>
     <div id="sacn-status">Status: 🔴 Waiting</div>
     <div class="setting">

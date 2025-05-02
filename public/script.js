@@ -10,6 +10,7 @@ let gridWidth      = parseInt(localStorage.getItem('gridWidth')  || '50', 10);
 let gridHeight     = parseInt(localStorage.getItem('gridHeight') || '50', 10);
 let dragState = null;
 let migrationPending = false;
+let protocol = localStorage.getItem('protocol') || 'sACN';
 
 const fixtureConfigs = {};
 const DISCONNECT_TIMEOUT = 5000;
@@ -62,6 +63,13 @@ function updateStatus(connected) {
 function setupSettingsMenu() {
   const settingsIcon = document.getElementById('settings-icon');
   const settingsModal = document.getElementById('settings-modal');
+  const protocolSelect = document.getElementById('protocol-select');
+  protocolSelect.value = protocol;
+
+  protocolSelect.addEventListener('change', () => {
+    protocol = protocolSelect.value;
+    localStorage.setItem('protocol', protocol);
+  });
 
   settingsIcon.addEventListener('click', () => {
     settingsModal.style.display = (settingsModal.style.display === 'block') ? 'none' : 'block';
@@ -78,11 +86,18 @@ function setupSettingsMenu() {
 
 function applySettings() {
   const nic = document.getElementById('nic').value;
-  console.log('[Client] applySettings() called; NIC =', nic);
+  const protocolValue = document.getElementById('protocol-select').value;
+  localStorage.setItem('protocol', protocol);
+
+  console.log('[Client] applySettings() → NIC=', nicValue, 'Protocol=', protocol);
 
   // — if there’s already an open WS, just tell it to switch NIC
   if (ws && ws.readyState === WebSocket.OPEN) {
-    ws.send(JSON.stringify({ type: 'connect', nic }));
+    ws.send(JSON.stringify({
+      type: 'connect',
+      nic: nicValue,
+      protocol
+    }));
     return;
   }
 
@@ -90,7 +105,11 @@ function applySettings() {
   ws = new WebSocket(`ws://${location.host}`);
   ws.onopen = () => {
     console.log('[Client] WebSocket connected');
-    ws.send(JSON.stringify({ type: 'connect', nic }));
+    ws.send(JSON.stringify({
+      type: 'connect',
+      nic: nicValue,
+      protocol
+    }));
     // start the 5s “no‐data” timeout
     if (migrationPending) {
       savePatch();
@@ -113,7 +132,7 @@ function applySettings() {
 
     } else if (data.type === 'update') {
       // mark alive + reset our 5s timeout
-      updateStatus(true);
+      updateStatus(false);
       clearTimeout(disconnectTimer);
       disconnectTimer = setTimeout(() => updateStatus(false), DISCONNECT_TIMEOUT);
       //console.log('[Client] calling processDMXUpdate for universe', data.universe, 'with', data.fixtures.length, 'fixtures');

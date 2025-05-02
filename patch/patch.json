@@ -1,30 +1,16 @@
 [
   {
-    "fixtureType": "TestSquare",
-    "universe": 1,
-    "address": 1,
+    "fixtureType": "BOLT1C",
+    "universe": 3,
+    "address": 31,
     "x": 180,
-    "y": 100
+    "y": 150
   },
   {
-    "fixtureType": "TestSquare",
-    "universe": 1,
-    "address": 21,
-    "x": 405,
-    "y": 100
-  },
-  {
-    "fixtureType": "TestSquare",
-    "universe": 2,
-    "address": 1,
-    "x": 90,
-    "y": 250
-  },
-  {
-    "fixtureType": "TestSquare",
-    "universe": 2,
-    "address": 21,
-    "x": 225,
+    "fixtureType": "BOLT1C",
+    "universe": 3,
+    "address": 71,
+    "x": 630,
     "y": 250
   }
 ]

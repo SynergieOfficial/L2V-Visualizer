@@ -5,7 +5,12 @@ const path      = require('path');
 const http      = require('http');
 const WebSocket = require('ws');
 const dgram     = require('dgram');
-const sockets = {}; // universe → dgram socket
+const express = require('express');
+const http    = require('http');
+
+const BaseReceiver    = require('./lib/dmx-protocol/baseReceiver');
+const { SACNReceiver }   = require('./lib/dmx-protocol/sacnReceiver');
+const { ArtNetReceiver } = require('./lib/dmx-protocol/artnetReceiver');
 
 const app    = express();
 const server = http.createServer(app);
@@ -19,7 +24,8 @@ const patchFile = path.join(__dirname, 'patch', 'patch.json');
 let outputFixtures = [];
 let universe       = 1;
 let nic            = '127.0.0.1';
-let udpSocket;
+let protocol       = 'sACN';      // ← new: "sACN" or "ArtNet"
+const sockets      = {};          // reuse your existing sockets map
 
 /** Static file serving */
 app.use(express.static('public'));
@@ -70,13 +76,13 @@ wss.on('connection', ws => {
     //console.log('[sACN] WS message received → type:', msg.type, ', payload:', msg);
 
     if (msg.type === 'connect') {
-      nic = msg.nic;
-      console.log(`[sACN] Client connected → NIC=${nic}`);
-
-      loadPatch();     // populates outputFixtures
-      setupReceivers();// spawns one UDP socket per universe
+      nic      = msg.nic;
+      protocol = msg.protocol || protocol;    // read protocol from client (fallback to previous)
+      console.log(`[sACN] Client connected → NIC=${nic}, protocol=${protocol}`);
+    
+      loadPatch();      // populates outputFixtures
+      setupReceivers(); // will now choose sACN or Art-Net based on `protocol`
       ws.send(JSON.stringify({ type: 'status', connected: true }));
-
     } else if (msg.type === 'save') {
       fs.writeFileSync(patchFile, JSON.stringify(msg.patch, null, 2));
       console.log('[sACN] patch/patch.json saved');
@@ -137,61 +143,79 @@ function loadPatch() {
 
 /** Start listening for sACN packets */
 function setupReceivers() {
-  // Tear down any old sockets
+  // 1) tear down any old sockets
   Object.values(sockets).forEach(s => s.close());
-  Object.keys(sockets).forEach(u => delete sockets[u]);
+  Object.keys(sockets).forEach(k => delete sockets[k]);
 
-  // Which universes do we need to listen on?
-  const universes = [...new Set(outputFixtures.map(f => f.universe))];
-  console.log('[sACN] setupReceivers → monitoring universes:', universes);
-
-  universes.forEach(u => {
-    // Create a new multicast socket that allows address reuse
+  // 2) dispatch based on protocol
+  if (protocol === 'ArtNet') {
+    const ARTNET_PORT = 6454;
     const sock = dgram.createSocket({ type: 'udp4', reuseAddr: true });
 
     sock.on('error', err => {
-      console.error(`[sACN] UDP socket error on U${u}:`, err);
+      console.error('[Art-Net] UDP socket error:', err);
     });
 
-    // Bind with exclusive: false so multiple sockets can share port 5568
-    sock.bind({ port: SACN_PORT, exclusive: false }, () => {
-      const mcast = `239.255.${(u >> 8) & 0xff}.${u & 0xff}`;
-      sock.addMembership(mcast, nic);
-      console.log(`[sACN] Joined universe ${u} → ${mcast} on NIC ${nic}`);
+    sock.bind({ port: ARTNET_PORT, exclusive: false }, () => {
+      console.log(`[Art-Net] Listening on ${ARTNET_PORT} via NIC ${nic}`);
     });
 
     sock.on('message', packet => {
-      //console.log(`[sACN] 📨 UDP packet on U${u} (len=${packet.length})`);
-      if (packet.length < 512) {
-        console.warn(`[sACN] Dropping short packet (${packet.length} bytes) on U${u}`);
-        return;
-      }
+      // check “Art-” header & OpDmx opcode
+      if (packet.readUInt16BE(0) !== 0x4174) return;
+      if (packet.readUInt16LE(8) !== 0x5000) return;
 
-      const dmx = parseSacn(packet);
-      //console.log(`[sACN]   Parsed DMX frame (channels=${dmx.length}) for U${u}`);
+      const universe = packet.readUInt16LE(14);
+      const length   = packet.readUInt16BE(16);
+      if (packet.length < 18 + length) return;
 
+      const dmx = Array.from(packet.slice(18, 18 + length));
       const fixtures = outputFixtures
-        .filter(f => f.universe === u)
-        .map(f => ({
-          id: `fixture-${f.universe}-${f.address}`,
-          dmx
-        }));
+        .filter(f => f.universe === universe)
+        .map(f => ({ id:`fixture-${f.universe}-${f.address}`, dmx }));
 
-      const payload = JSON.stringify({ type: 'update', universe: u, fixtures });
-      //console.log(
-      //  `[sACN] ▶️ Broadcasting update to ${wss.clients.size} WS clients: U${u}, fixtures=${fixtures.length}`
-      //);
-
+      const payload = JSON.stringify({ type:'update', universe, fixtures });
       wss.clients.forEach(c => {
-        if (c.readyState === WebSocket.OPEN) {
-          c.send(payload);
-        }
+        if (c.readyState === WebSocket.OPEN) c.send(payload);
       });
     });
 
-    // Keep track so we can close on re-setup
-    sockets[u] = sock;
-  });
+    sockets.artnet = sock;
+
+  } else {
+    // old sACN behavior
+    const universes = [...new Set(outputFixtures.map(f => f.universe))];
+    console.log('[sACN] setupReceivers → monitoring universes:', universes);
+
+    universes.forEach(u => {
+      const sock = dgram.createSocket({ type:'udp4', reuseAddr:true });
+
+      sock.on('error', err => {
+        console.error(`[sACN] UDP socket error on U${u}:`, err);
+      });
+
+      sock.bind({ port: SACN_PORT, exclusive: false }, () => {
+        const mcast = `239.255.${(u >> 8)&0xff}.${u&0xff}`;
+        sock.addMembership(mcast, nic);
+        console.log(`[sACN] Joined U${u} → ${mcast} on NIC ${nic}`);
+      });
+
+      sock.on('message', packet => {
+        if (packet.length < 512) return;
+        const dmx = parseSacn(packet);
+        const fixtures = outputFixtures
+          .filter(f => f.universe === u)
+          .map(f => ({ id:`fixture-${f.universe}-${f.address}`, dmx }));
+
+        const payload = JSON.stringify({ type:'update', universe:u, fixtures });
+        wss.clients.forEach(c => {
+          if (c.readyState === WebSocket.OPEN) c.send(payload);
+        });
+      });
+
+      sockets[u] = sock;
+    });
+  }
 }
 
 /** Simple sACN parser: use last 512 bytes */
