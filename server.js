@@ -162,6 +162,7 @@ function setupReceivers() {
   });
 
   receiver.on('data', ({ universe, channels }) => {
+    console.log(`[${protocol}] data on U${universe}:`, channels.slice(0, 8)); // show first 8 channels
     // reuse your old broadcast logic:
     const fixtures = outputFixtures
       .filter(f => f.universe === universe)
