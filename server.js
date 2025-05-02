@@ -1,3 +1,5 @@
+// server.js
+
 const express   = require('express');
 const fs        = require('fs');
 const os        = require('os');
@@ -16,14 +18,11 @@ const server = http.createServer(app);
 const wss    = new WebSocket.Server({ server });
 
 const PORT      = 3000;
-const SACN_PORT = 5568;
-// point at patch/patch.json instead of root
 const patchFile = path.join(__dirname, 'patch', 'patch.json');
 
-let outputFixtures = [];
-let universe       = 1;
+let outputFixtures = [];      // { universe: Number, address: Number }[]
 let nic            = '127.0.0.1';
-let protocol       = 'sACN';      // ← new: "sACN" or "ArtNet"
+let protocol       = 'sACN';  // "sACN" or "ArtNet"
 let receiver       = null;
 
 /** Static file serving */
@@ -35,8 +34,8 @@ app.use(express.static(__dirname));
 app.get('/nics', (req, res) => {
   const interfaces = os.networkInterfaces();
   const nics = [{ name: 'TEST SIGNAL', address: '127.0.0.1' }];
-  for (const [name, list] of Object.entries(interfaces)) {
-    for (const iface of list) {
+  for (const [name, addrs] of Object.entries(interfaces)) {
+    for (const iface of addrs) {
       if (iface.family === 'IPv4' && !iface.internal) {
         nics.push({ name, address: iface.address });
       }
@@ -58,56 +57,52 @@ app.get('/fixtures', (req, res) => {
 });
 
 /** WebSocket: connect & save */
-// ── when a new browser connects, set up its message handler
 wss.on('connection', ws => {
   console.log('[sACN] WebSocket client connected');
 
-  // Handle every incoming WS frame from this client:
   ws.on('message', raw => {
-    // ── parse & log every incoming WS frame
     let msg;
     try {
       msg = JSON.parse(raw);
     } catch (err) {
-      console.error('[sACN] Invalid JSON from WS client →', raw);
+      console.error('[sACN] Invalid JSON →', raw);
       return;
     }
-    //console.log('[sACN] WS message received → type:', msg.type, ', payload:', msg);
 
     if (msg.type === 'connect') {
+      //console.log('[DEBUG] outputFixtures:', outputFixtures);
       nic      = msg.nic;
-      protocol = msg.protocol || protocol;    // read protocol from client (fallback to previous)
+      protocol = msg.protocol || protocol;
       console.log(`[sACN] Client connected → NIC=${nic}, protocol=${protocol}`);
-    
-      loadPatch();      // populates outputFixtures
-      setupReceivers(); // will now choose sACN or Art-Net based on `protocol`
+
+      loadPatch();
+      setupReceivers();
       ws.send(JSON.stringify({ type: 'status', connected: true }));
+
     } else if (msg.type === 'save') {
-      fs.writeFileSync(patchFile, JSON.stringify(msg.patch, null, 2));
+      fs.writeFileSync(patchFile, JSON.stringify(msg.patch, null, 2), 'utf-8');
       console.log('[sACN] patch/patch.json saved');
-      console.log(`[sACN] outputFixtures now has ${msg.patch.length} entries`);
       outputFixtures = msg.patch.map(p => ({
         universe: p.universe,
         address: p.address
       }));
+      //console.log('[DEBUG] outputFixtures updated:', outputFixtures);
 
     } else if (msg.type === 'ping') {
-      // heartbeat reply
       ws.send(JSON.stringify({ type: 'pong' }));
-    } else {
-      console.warn('[sACN] WS got unknown msg.type →', msg.type);
-    }
-  }); // end ws.on('message')
-});   // end wss.on('connection')
 
+    } else {
+      console.warn('[sACN] Unknown WS message type →', msg.type);
+    }
+  });
+});
 
 /** Load patch into memory */
 function loadPatch() {
   try {
-    // Read existing patch data
     let patchData = JSON.parse(fs.readFileSync(patchFile, 'utf-8'));
 
-    // Back-fill missing universe → 1
+    // back‐fill missing universe → 1
     let migrated = false;
     patchData = patchData.map(entry => {
       if (entry.universe === undefined) {
@@ -117,32 +112,27 @@ function loadPatch() {
       return entry;
     });
 
-    // If we added universe fields, overwrite on disk
     if (migrated) {
       fs.writeFileSync(patchFile, JSON.stringify(patchData, null, 2), 'utf-8');
-      console.log('[sACN] Migrated patch.json entries to include universe=1');
+      console.log('[sACN] Migrated patch.json to include universe=1');
     }
 
-    // Populate in-memory fixtures
     outputFixtures = patchData.map(p => ({
       universe: p.universe,
-      address: p.address
+      address:  p.address
     }));
-    //console.log(
-    //  `[sACN] Loaded ${outputFixtures.length} fixtures from patch/patch.json`
-    //);
-
   } catch (err) {
-    console.log(
-      '[sACN] No valid patch/patch.json found or parse error; starting with zero fixtures'
-    );
+    console.log('[sACN] No patch.json found; starting with empty patch');
     outputFixtures = [];
   }
 }
 
-/** Start listening for sACN/Artnet packets */
+/**
+ * Start (or restart) the DMX receiver using the chosen protocol.
+ * Tears down the old receiver, spins up a new one, and broadcasts frames.
+ */
 function setupReceivers() {
-  // 1) Tear down any old receiver
+  // 1) Tear down old receiver
   if (receiver) {
     receiver.stop();
     receiver = null;
@@ -153,17 +143,23 @@ function setupReceivers() {
     ? ArtNetReceiver
     : SACNReceiver;
 
-  // 3) Create and wire up
-  //    We pass { nic, universes } into SACNReceiver so it knows which multicast groups;
-  //    ArtNetReceiver will ignore the universes field.
+  // 3) Instantiate and wire up
   receiver = new ReceiverClass({
     nic,
     universes: [...new Set(outputFixtures.map(f => f.universe))]
   });
 
-  receiver.on('data', ({ universe, channels }) => {
-    console.log(`[${protocol}] data on U${universe}:`, channels.slice(0, 8)); // show first 8 channels
-    // reuse your old broadcast logic:
+  receiver.on('data', ({ universe: rawUniverse, channels }) => {
+    // Map Art-Net 0-based → UI 1-based; sACN is already correct
+    const universe = protocol === 'ArtNet'
+      ? rawUniverse + 1
+      : rawUniverse;
+
+    //console.log(
+    //  `[DEBUG][${protocol}] rawUniverse=${rawUniverse} → universe=${universe}:`,
+    //  channels.slice(0, 8)
+    //);
+
     const fixtures = outputFixtures
       .filter(f => f.universe === universe)
       .map(f => ({
@@ -171,21 +167,22 @@ function setupReceivers() {
         dmx: channels
       }));
 
-    const payload = JSON.stringify({ type:'update', universe, fixtures });
+    const payload = JSON.stringify({ type: 'update', universe, fixtures });
     wss.clients.forEach(c => {
-      if (c.readyState === WebSocket.OPEN) c.send(payload);
+      if (c.readyState === WebSocket.OPEN) {
+        c.send(payload);
+      }
     });
   });
 
-  // 4) Start it listening
+  // 4) Start listening
   receiver.start();
 }
 
-/** Simple sACN parser: use last 512 bytes */
+/** Simple sACN parser: take the last 512 bytes */
 function parseSacn(packet) {
   if (packet.length < 512) return [];
-  const start = packet.length - 512;
-  return Array.from(packet.slice(start, start + 512));
+  return Array.from(packet.slice(packet.length - 512));
 }
 
 server.listen(PORT, () => {
@@ -194,7 +191,6 @@ server.listen(PORT, () => {
 
 process.on('SIGINT', () => {
   console.log('Shutting down DMX receiver…');
-  // previously you closed sockets; now:
   if (receiver) receiver.stop();
   process.exit();
 });

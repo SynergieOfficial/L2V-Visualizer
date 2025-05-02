@@ -125,22 +125,19 @@ function applySettings() {
   };
 
   ws.onmessage = (event) => {
-    //console.log('[Client] ws.onmessage raw payload →', event.data);
+    //console.log('[Client][DEBUG] raw ws.onmessage →', event.data);
     const data = JSON.parse(event.data);
-    //console.log('[Client] ws.onmessage parsed →', data);
-
+  
     if (data.type === 'status') {
-      // server connection ack
       updateStatus(data.connected);
-
-        } else if (data.type === 'update') {
-            // mark alive + reset our 5s timeout
-            updateStatus(true);
+  
+    } else if (data.type === 'update') {
+      //console.log('[Client][DEBUG] parsed update →', data);
+      updateStatus(true);
       clearTimeout(disconnectTimer);
       disconnectTimer = setTimeout(() => updateStatus(false), DISCONNECT_TIMEOUT);
-      //console.log('[Client] calling processDMXUpdate for universe', data.universe, 'with', data.fixtures.length, 'fixtures');
       processDMXUpdate(data);
-      }
+    }
   };
 
   ws.onclose = () => {
@@ -466,11 +463,12 @@ function loadFixture(type, address, universe, x = 0, y = 0) {
 
 function processDMXUpdate({ universe, fixtures }) {
     //console.log('[Client] processDMXUpdate() start → universe:', universe, ', fixtures:', fixtures);
-  
+    //console.log(`[Client][DEBUG] processDMXUpdate U${universe} →`, fixtures);
   fixtures.forEach(({ id, dmx }) => {
+    console.log(`  → Looking for element #${id}`);
     const wrapper = document.getElementById(id);
     if (!wrapper) return;
-
+    console.warn(`  [Client][WARN] No element found for #${id}`);
     // zero-based DMX start index for this fixture
     const base = parseInt(wrapper.dataset.address, 10) - 1;
 
@@ -478,6 +476,7 @@ function processDMXUpdate({ universe, fixtures }) {
     if (typeof config === 'string') {
       config = JSON.parse(config);
     }
+    console.log(`  [Client][OK] Found #${id}, applying DMX`, dmx.slice(0, 8));
 
     config.attributes.forEach(attr => {
       // absolute DMX index in the universe
