@@ -1,16 +1,422 @@
 [
   {
-    "fixtureType": "TestSquare",
-    "universe": 1,
+    "fixtureType": "BOLT1C",
+    "universe": 11,
     "address": 1,
-    "x": 0,
-    "y": 0
+    "x": 7,
+    "y": 14
   },
   {
-    "fixtureType": "TestSquare",
-    "universe": 50,
-    "address": 1,
+    "fixtureType": "BOLT1C",
+    "universe": 11,
+    "address": 41,
+    "x": 39,
+    "y": 14
+  },
+  {
+    "fixtureType": "BOLT1C",
+    "universe": 11,
+    "address": 81,
+    "x": 71,
+    "y": 14
+  },
+  {
+    "fixtureType": "BOLT1C",
+    "universe": 11,
+    "address": 121,
+    "x": 103,
+    "y": 14
+  },
+  {
+    "fixtureType": "BOLT1C",
+    "universe": 11,
+    "address": 161,
     "x": 135,
-    "y": 0
+    "y": 14
+  },
+  {
+    "fixtureType": "BOLT1C",
+    "universe": 11,
+    "address": 201,
+    "x": 167,
+    "y": 14
+  },
+  {
+    "fixtureType": "BOLT1C",
+    "universe": 11,
+    "address": 241,
+    "x": 199,
+    "y": 14
+  },
+  {
+    "fixtureType": "BOLT1C",
+    "universe": 11,
+    "address": 281,
+    "x": 231,
+    "y": 14
+  },
+  {
+    "fixtureType": "BOLT1C",
+    "universe": 11,
+    "address": 321,
+    "x": 263,
+    "y": 14
+  },
+  {
+    "fixtureType": "BOLT1C",
+    "universe": 11,
+    "address": 361,
+    "x": 295,
+    "y": 14
+  },
+  {
+    "fixtureType": "BOLT1C",
+    "universe": 12,
+    "address": 1,
+    "x": 327,
+    "y": 14
+  },
+  {
+    "fixtureType": "BOLT1C",
+    "universe": 12,
+    "address": 41,
+    "x": 359,
+    "y": 14
+  },
+  {
+    "fixtureType": "BOLT1C",
+    "universe": 12,
+    "address": 81,
+    "x": 391,
+    "y": 14
+  },
+  {
+    "fixtureType": "BOLT1C",
+    "universe": 12,
+    "address": 121,
+    "x": 423,
+    "y": 14
+  },
+  {
+    "fixtureType": "BOLT1C",
+    "universe": 12,
+    "address": 161,
+    "x": 455,
+    "y": 14
+  },
+  {
+    "fixtureType": "BOLT1C",
+    "universe": 12,
+    "address": 201,
+    "x": 487,
+    "y": 14
+  },
+  {
+    "fixtureType": "BOLT1C",
+    "universe": 12,
+    "address": 241,
+    "x": 519,
+    "y": 14
+  },
+  {
+    "fixtureType": "BOLT1C",
+    "universe": 12,
+    "address": 281,
+    "x": 551,
+    "y": 14
+  },
+  {
+    "fixtureType": "BOLT1C",
+    "universe": 12,
+    "address": 321,
+    "x": 583,
+    "y": 14
+  },
+  {
+    "fixtureType": "BOLT1C",
+    "universe": 12,
+    "address": 361,
+    "x": 615,
+    "y": 14
+  },
+  {
+    "fixtureType": "BOLT1C",
+    "universe": 13,
+    "address": 1,
+    "x": 7,
+    "y": 96
+  },
+  {
+    "fixtureType": "BOLT1C",
+    "universe": 13,
+    "address": 41,
+    "x": 39,
+    "y": 96
+  },
+  {
+    "fixtureType": "BOLT1C",
+    "universe": 13,
+    "address": 81,
+    "x": 71,
+    "y": 96
+  },
+  {
+    "fixtureType": "BOLT1C",
+    "universe": 13,
+    "address": 121,
+    "x": 103,
+    "y": 96
+  },
+  {
+    "fixtureType": "BOLT1C",
+    "universe": 13,
+    "address": 161,
+    "x": 135,
+    "y": 96
+  },
+  {
+    "fixtureType": "BOLT1C",
+    "universe": 13,
+    "address": 201,
+    "x": 167,
+    "y": 96
+  },
+  {
+    "fixtureType": "BOLT1C",
+    "universe": 13,
+    "address": 241,
+    "x": 199,
+    "y": 96
+  },
+  {
+    "fixtureType": "BOLT1C",
+    "universe": 13,
+    "address": 281,
+    "x": 231,
+    "y": 96
+  },
+  {
+    "fixtureType": "BOLT1C",
+    "universe": 13,
+    "address": 321,
+    "x": 263,
+    "y": 96
+  },
+  {
+    "fixtureType": "BOLT1C",
+    "universe": 13,
+    "address": 361,
+    "x": 295,
+    "y": 96
+  },
+  {
+    "fixtureType": "BOLT1C",
+    "universe": 14,
+    "address": 1,
+    "x": 327,
+    "y": 96
+  },
+  {
+    "fixtureType": "BOLT1C",
+    "universe": 14,
+    "address": 41,
+    "x": 359,
+    "y": 96
+  },
+  {
+    "fixtureType": "BOLT1C",
+    "universe": 14,
+    "address": 81,
+    "x": 391,
+    "y": 96
+  },
+  {
+    "fixtureType": "BOLT1C",
+    "universe": 14,
+    "address": 121,
+    "x": 423,
+    "y": 96
+  },
+  {
+    "fixtureType": "BOLT1C",
+    "universe": 14,
+    "address": 161,
+    "x": 455,
+    "y": 96
+  },
+  {
+    "fixtureType": "BOLT1C",
+    "universe": 14,
+    "address": 201,
+    "x": 487,
+    "y": 96
+  },
+  {
+    "fixtureType": "BOLT1C",
+    "universe": 14,
+    "address": 241,
+    "x": 519,
+    "y": 96
+  },
+  {
+    "fixtureType": "BOLT1C",
+    "universe": 14,
+    "address": 281,
+    "x": 551,
+    "y": 96
+  },
+  {
+    "fixtureType": "BOLT1C",
+    "universe": 14,
+    "address": 321,
+    "x": 583,
+    "y": 96
+  },
+  {
+    "fixtureType": "BOLT1C",
+    "universe": 14,
+    "address": 361,
+    "x": 615,
+    "y": 96
+  },
+  {
+    "fixtureType": "BOLT1C",
+    "universe": 15,
+    "address": 1,
+    "x": 7,
+    "y": 176
+  },
+  {
+    "fixtureType": "BOLT1C",
+    "universe": 15,
+    "address": 41,
+    "x": 39,
+    "y": 176
+  },
+  {
+    "fixtureType": "BOLT1C",
+    "universe": 15,
+    "address": 81,
+    "x": 71,
+    "y": 176
+  },
+  {
+    "fixtureType": "BOLT1C",
+    "universe": 15,
+    "address": 121,
+    "x": 103,
+    "y": 176
+  },
+  {
+    "fixtureType": "BOLT1C",
+    "universe": 15,
+    "address": 161,
+    "x": 135,
+    "y": 176
+  },
+  {
+    "fixtureType": "BOLT1C",
+    "universe": 15,
+    "address": 201,
+    "x": 167,
+    "y": 176
+  },
+  {
+    "fixtureType": "BOLT1C",
+    "universe": 15,
+    "address": 241,
+    "x": 199,
+    "y": 176
+  },
+  {
+    "fixtureType": "BOLT1C",
+    "universe": 15,
+    "address": 281,
+    "x": 231,
+    "y": 176
+  },
+  {
+    "fixtureType": "BOLT1C",
+    "universe": 15,
+    "address": 321,
+    "x": 263,
+    "y": 176
+  },
+  {
+    "fixtureType": "BOLT1C",
+    "universe": 15,
+    "address": 361,
+    "x": 295,
+    "y": 176
+  },
+  {
+    "fixtureType": "BOLT1C",
+    "universe": 16,
+    "address": 1,
+    "x": 327,
+    "y": 176
+  },
+  {
+    "fixtureType": "BOLT1C",
+    "universe": 16,
+    "address": 41,
+    "x": 359,
+    "y": 176
+  },
+  {
+    "fixtureType": "BOLT1C",
+    "universe": 16,
+    "address": 81,
+    "x": 391,
+    "y": 176
+  },
+  {
+    "fixtureType": "BOLT1C",
+    "universe": 16,
+    "address": 121,
+    "x": 423,
+    "y": 176
+  },
+  {
+    "fixtureType": "BOLT1C",
+    "universe": 16,
+    "address": 161,
+    "x": 455,
+    "y": 176
+  },
+  {
+    "fixtureType": "BOLT1C",
+    "universe": 16,
+    "address": 201,
+    "x": 487,
+    "y": 176
+  },
+  {
+    "fixtureType": "BOLT1C",
+    "universe": 16,
+    "address": 241,
+    "x": 519,
+    "y": 176
+  },
+  {
+    "fixtureType": "BOLT1C",
+    "universe": 16,
+    "address": 281,
+    "x": 551,
+    "y": 176
+  },
+  {
+    "fixtureType": "BOLT1C",
+    "universe": 16,
+    "address": 321,
+    "x": 583,
+    "y": 176
+  },
+  {
+    "fixtureType": "BOLT1C",
+    "universe": 16,
+    "address": 361,
+    "x": 615,
+    "y": 176
   }
 ]
